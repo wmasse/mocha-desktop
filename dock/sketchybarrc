@@ -54,7 +54,7 @@ TILE_EVENTS="mouse.entered mouse.exited mouse.exited.global"
 # immediately: launch first, then a quick press dip that springs back
 click() { # item, launch command
   echo "if [ \"\$BUTTON\" = right ]; then $PLUGIN_DIR/menu.sh show ${1#app.}; else $2 &
-mochadock --set $1 popup.drawing=off background.height=$PRESS; sleep 0.04; mochadock --set $1 background.height=$HOVER; fi"
+mochadock --set $1 background.height=$PRESS; sleep 0.04; mochadock --set $1 background.height=$HOVER; fi"
 }
 
 # App name shown above a tile on hover; it's also the header of the right-click menu
