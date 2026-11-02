@@ -1,0 +1,113 @@
+#!/bin/bash
+# Mocha pastel — dock. A second SketchyBar instance, run through a link named
+# "mochadock" (SketchyBar names each instance after its file name).
+
+CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar-dock}"
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+APPS_FILE="$CONFIG_DIR/apps.txt"
+source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/sizes.sh"
+source "$CONFIG_DIR/glyphs.sh"
+
+FONT="Hack Nerd Font"
+rm -rf "/tmp/mochadock-$USER"  # hover state from before this (re)load
+APP_COUNT="$(grep -v -e '^#' -e '^$' "$APPS_FILE" | wc -l | tr -d ' ')"
+
+# Keep the bar window only as wide as the dock (plus room for a hovered tile)
+# so it never blocks clicks elsewhere on the screen
+SCREEN_W="$(osascript -l JavaScript -e 'ObjC.import("AppKit");$.NSScreen.mainScreen.frame.size.width' 2>/dev/null)"
+SCREEN_W="${SCREEN_W:-1512}"
+DOCK_W=$(( (APP_COUNT + 1) * (TILE + 8) + 80 ))
+MARGIN=$(( (SCREEN_W - DOCK_W) / 2 ))
+[ "$MARGIN" -lt 0 ] && MARGIN=0
+
+mochadock --bar position=bottom \
+                height=$(( TRAY_HEIGHT + 12 )) \
+                y_offset=$DOCK_Y \
+                margin=$MARGIN \
+                color=$TRANSPARENT \
+                topmost=window
+
+mochadock --default icon.font="$FONT:Bold:$TILE_FONT.0" \
+                    label.font="$FONT:Bold:13.0" \
+                    label.color=$TEXT \
+                    label.font="$FONT:Bold:13.0" \
+                    label.color=$TEXT \
+                    icon.width=$TILE \
+                    icon.align=center \
+                    icon.padding_left=0 \
+                    icon.padding_right=0 \
+                    label.drawing=off \
+                    background.corner_radius=$TILE_RADIUS \
+                    background.height=$TILE \
+                    padding_left=$TILE_GAP \
+                    padding_right=$TILE_GAP \
+                    popup.align=center \
+                    popup.background.color=$SURFACE0 \
+                    popup.background.corner_radius=14 \
+                    popup.background.border_width=1 \
+                    popup.background.border_color=$SURFACE1
+
+TILE_EVENTS="mouse.entered mouse.exited mouse.exited.global"
+
+# Click handler with everything baked in, so a left click opens the app
+# immediately: launch first, then a quick press dip that springs back
+click() { # item, launch command
+  echo "if [ \"\$BUTTON\" = right ]; then $PLUGIN_DIR/menu.sh show ${1#app.}; else $2 &
+mochadock --set $1 popup.drawing=off background.height=$PRESS; sleep 0.04; mochadock --set $1 background.height=$HOVER; fi"
+}
+
+# App name shown above a tile on hover; it's also the header of the right-click menu
+name_label() { # item, label
+  mochadock --add item "name.${1#app.}" popup."$1" \
+            --set "name.${1#app.}" icon.drawing=off label="$2" label.drawing=on \
+                                   label.padding_left=12 label.padding_right=12 \
+                                   background.drawing=off
+}
+
+while IFS='|' read -r -u 3 key path bundle glyph color; do
+  case "$key" in ''|\#*) continue ;; esac
+  mochadock --add item "app.$key" center \
+            --set "app.$key" icon="$glyph" \
+                             icon.color="${!color}" \
+                             background.color=$SURFACE1 \
+                             script="$PLUGIN_DIR/tile.sh" \
+                             click_script="$(click "app.$key" "open -b $bundle")" \
+            --subscribe "app.$key" $TILE_EVENTS
+  name_label "app.$key" "$(basename "$path" .app)"
+done 3< "$APPS_FILE"
+
+mochadock --add item divider center \
+          --set divider icon.drawing=off background.color=$SURFACE1 \
+                        background.height=34 width=2 padding_left=8 padding_right=8 \
+          --add item trash center \
+          --set trash icon="$G_TRASH" icon.color=$TEXT \
+                      background.color=$SURFACE1 \
+                      script="$PLUGIN_DIR/tile.sh" \
+                      click_script="$(click trash "open $HOME/.Trash")" \
+          --subscribe trash $TILE_EVENTS
+name_label trash "Trash"
+
+mochadock --add bracket dock '/app\..*/' divider trash \
+          --set dock background.color=$SURFACE0 \
+                     background.corner_radius=24 \
+                     background.height=$TRAY_HEIGHT \
+                     background.border_width=1 \
+                     background.border_color=$SURFACE1
+
+# Invisible item that keeps running state and the focus ring current
+mochadock --add item refresh left \
+          --set refresh drawing=off update_freq=5 script="$PLUGIN_DIR/refresh.sh" \
+          --subscribe refresh front_app_switched system_woke
+
+# Invisible item that slides the dock away for full-screen apps and back after
+mochadock --add item fullscreen left \
+          --set fullscreen drawing=off script="$PLUGIN_DIR/fullscreen.sh" \
+          --subscribe fullscreen space_change display_change system_woke
+
+mochadock --update
+
+# Drag-and-drop helper (dockdrop/main.swift): started once, keeps running across reloads
+if [ -x "$CONFIG_DIR/bin/dockdrop" ] && ! pgrep -f "$CONFIG_DIR/bin/dockdrop" >/dev/null; then
+  CONFIG_DIR="$CONFIG_DIR" nohup "$CONFIG_DIR/bin/dockdrop" >/dev/null 2>&1 &
+fi

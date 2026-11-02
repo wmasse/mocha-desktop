@@ -1,0 +1,95 @@
+#!/bin/bash
+# Mocha pastel — SketchyBar menu bar
+
+CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar}"
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/glyphs.sh"
+
+FONT="Hack Nerd Font"
+DOCK="$HOME/.config/sketchybar-dock/bin/mochadock"
+
+# Bar: transparent, floating pills sit on top of it
+sketchybar --bar position=top \
+                 height=36 \
+                 y_offset=2 \
+                 margin=6 \
+                 color=$TRANSPARENT \
+                 topmost=off
+
+sketchybar --default icon.font="$FONT:Bold:15.0" \
+                     label.font="$FONT:Bold:13.0" \
+                     icon.color=$TEXT \
+                     label.color=$TEXT \
+                     background.color=$SURFACE0 \
+                     background.corner_radius=12 \
+                     background.height=26 \
+                     padding_left=3 \
+                     padding_right=3 \
+                     icon.padding_left=10 \
+                     icon.padding_right=5 \
+                     label.padding_left=5 \
+                     label.padding_right=10
+
+HOVER_EVENTS="mouse.entered mouse.exited"
+
+# ── Left: Apple pill (click for a small menu) + current app ──
+sketchybar --add item apple left \
+           --set apple icon="$G_APPLE" \
+                       icon.color=$BASE \
+                       icon.padding_right=10 \
+                       label.drawing=off \
+                       background.color=$PINK \
+                       popup.background.color=$SURFACE0 \
+                       popup.background.corner_radius=12 \
+                       popup.background.border_width=2 \
+                       popup.background.border_color=$PINK \
+                       click_script="sketchybar --set apple popup.drawing=toggle"
+
+menu_item() { # name icon color label command
+  sketchybar --add item "apple.$1" popup.apple \
+             --set "apple.$1" icon="$2" icon.color="$3" label="$4" background.drawing=off \
+                   click_script="sketchybar --set apple popup.drawing=off; $5"
+}
+menu_item settings "$G_GEAR"     $MAUVE "Settings"         "open -a 'System Settings'"
+menu_item activity "$G_ACTIVITY" $GREEN "Activity Monitor" "open -a 'Activity Monitor'"
+menu_item reload   "$G_RELOAD"   $TEAL  "Reload bars"      "sketchybar --reload; [ -x '$DOCK' ] && '$DOCK' --reload"
+menu_item lock     "$G_LOCK"     $BLUE  "Lock screen"      "pmset displaysleepnow"
+menu_item sleep    "$G_SLEEP"    $PEACH "Sleep"            "pmset sleepnow"
+
+sketchybar --add item front_app left \
+           --set front_app icon.drawing=off \
+                           label.padding_left=10 \
+                           label.max_chars=22 \
+                           script="$PLUGIN_DIR/front_app.sh" \
+           --subscribe front_app front_app_switched
+
+# The notch is left empty on purpose so apps that live there (like Mantle) have it to themselves.
+
+# ── Right (added right-to-left): clock, battery, wifi, volume. All clickable. ──
+sketchybar --add item clock right \
+           --set clock icon="$G_CLOCK" icon.color=$PEACH label.color=$PEACH \
+                       update_freq=10 script="$PLUGIN_DIR/clock.sh" \
+                       click_script="open -a Calendar" \
+           --subscribe clock $HOVER_EVENTS
+
+sketchybar --add item battery right \
+           --set battery icon.color=$YELLOW label.color=$YELLOW \
+                         update_freq=120 script="$PLUGIN_DIR/battery.sh" \
+                         click_script="open 'x-apple.systempreferences:com.apple.Battery-Settings.extension'" \
+           --subscribe battery system_woke power_source_change $HOVER_EVENTS
+
+sketchybar --add item wifi right \
+           --set wifi label.drawing=off icon.padding_right=10 \
+                      update_freq=30 script="$PLUGIN_DIR/wifi.sh" \
+                      click_script="open 'x-apple.systempreferences:com.apple.wifi-settings-extension'" \
+           --subscribe wifi wifi_change system_woke $HOVER_EVENTS
+
+# Click to mute or unmute, scroll over it to change the volume
+sketchybar --add item volume right \
+           --set volume icon.color=$BLUE label.color=$BLUE \
+                        script="$PLUGIN_DIR/volume.sh" \
+                        click_script="osascript -e 'set volume output muted not (output muted of (get volume settings))'; SENDER=forced $PLUGIN_DIR/volume.sh" \
+           --subscribe volume volume_change mouse.scrolled $HOVER_EVENTS
+
+sketchybar --update
