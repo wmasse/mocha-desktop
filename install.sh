@@ -70,13 +70,13 @@ if wants dock; then
   mkdir -p "$DEST/bin"
   ln -sf "$(brew --prefix)/bin/sketchybar" "$DEST/bin/mochadock"
 
-  # Drag-and-drop helper: use the prebuilt one if this copy has it, else build it
+  # Dock helper (hover and drag and drop): use the prebuilt one if this copy has it, else build it
   if [ -x "$REPO/dock/bin/dockdrop" ]; then
     cp "$REPO/dock/bin/dockdrop" "$DEST/bin/dockdrop"
   elif command -v swiftc >/dev/null || xcrun --find swiftc >/dev/null 2>&1; then
-    "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" || echo "    couldn't build the drag-and-drop helper; the dock still works without it"
+    "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" || echo "    couldn't build the dock helper; the dock works, but without hover or drag and drop"
   else
-    echo "    skipped drag-and-drop onto the dock (needs Xcode Command Line Tools: xcode-select --install)"
+    echo "    skipped the dock helper for hover and drag and drop (needs Xcode Command Line Tools: xcode-select --install)"
   fi
 
   mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"

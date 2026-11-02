@@ -10,7 +10,7 @@ source "$CONFIG_DIR/sizes.sh"
 source "$CONFIG_DIR/glyphs.sh"
 
 FONT="Hack Nerd Font"
-rm -rf "/tmp/mochadock-$USER"  # hover state from before this (re)load
+rm -rf "/tmp/mochadock-$USER"  # menu state from before this (re)load
 APP_COUNT="$(grep -v -e '^#' -e '^$' "$APPS_FILE" | wc -l | tr -d ' ')"
 
 # Keep the bar window only as wide as the dock (plus room for a hovered tile)
@@ -48,8 +48,6 @@ mochadock --default icon.font="$FONT:Bold:$TILE_FONT.0" \
                     popup.background.border_width=1 \
                     popup.background.border_color=$SURFACE1
 
-TILE_EVENTS="mouse.entered mouse.exited mouse.exited.global"
-
 # Click handler with everything baked in, so a left click opens the app
 # immediately: launch first, then a quick press dip that springs back
 click() { # item, launch command
@@ -57,7 +55,7 @@ click() { # item, launch command
 mochadock --set $1 background.height=$PRESS; sleep 0.04; mochadock --set $1 background.height=$HOVER; fi"
 }
 
-# App name shown above a tile on hover; it's also the header of the right-click menu
+# App name shown above a tile on hover (hover itself is run by dockdrop); it's also the header of the right-click menu
 name_label() { # item, label
   mochadock --add item "name.${1#app.}" popup."$1" \
             --set "name.${1#app.}" icon.drawing=off label="$2" label.drawing=on \
@@ -71,9 +69,7 @@ while IFS='|' read -r -u 3 key path bundle glyph color; do
             --set "app.$key" icon="$glyph" \
                              icon.color="${!color}" \
                              background.color=$SURFACE1 \
-                             script="$PLUGIN_DIR/tile.sh" \
-                             click_script="$(click "app.$key" "open -b $bundle")" \
-            --subscribe "app.$key" $TILE_EVENTS
+                             click_script="$(click "app.$key" "open -b $bundle")"
   name_label "app.$key" "$(basename "$path" .app)"
 done 3< "$APPS_FILE"
 
@@ -83,9 +79,7 @@ mochadock --add item divider center \
           --add item trash center \
           --set trash icon="$G_TRASH" icon.color=$TEXT \
                       background.color=$SURFACE1 \
-                      script="$PLUGIN_DIR/tile.sh" \
-                      click_script="$(click trash "open $HOME/.Trash")" \
-          --subscribe trash $TILE_EVENTS
+                      click_script="$(click trash "open $HOME/.Trash")"
 name_label trash "Trash"
 
 mochadock --add bracket dock '/app\..*/' divider trash \
@@ -107,7 +101,7 @@ mochadock --add item fullscreen left \
 
 mochadock --update
 
-# Drag-and-drop helper (dockdrop/main.swift): started once, keeps running across reloads
+# Hover and drag-and-drop helper (dockdrop/main.swift): started once, keeps running across reloads
 if [ -x "$CONFIG_DIR/bin/dockdrop" ] && ! pgrep -f "$CONFIG_DIR/bin/dockdrop" >/dev/null; then
   CONFIG_DIR="$CONFIG_DIR" nohup "$CONFIG_DIR/bin/dockdrop" >/dev/null 2>&1 &
 fi

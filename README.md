@@ -18,7 +18,7 @@
 **Dock**
 - Squircle tiles in pastel colors, built from the apps already in your Dock
 - Running apps fill in with color; the app in front gets a ring
-- Hover to see the app's name; the tile grows smoothly without moving the others
+- Hover to see the app's name; the tile grows without moving the others, and keeps up however fast you move
 - Right-click for Open or Quit, Show in Finder, Move left or right, Add app, Remove from Dock
 - Drag files onto an app to open them with it, or onto the Trash to delete them
 - Slides out of the way for full-screen apps and back when you leave
@@ -49,7 +49,7 @@ The installer trusts SketchyBar's official Homebrew tap (`felixkratz/formulae`),
 | What | Where |
 |---|---|
 | Dock apps, order, icons and colors | Right-click a tile, or edit `~/.config/sketchybar-dock/apps.txt` |
-| Tile size, hover size, speed | `~/.config/sketchybar-dock/sizes.sh` |
+| Tile and hover size | `~/.config/sketchybar-dock/sizes.sh` |
 | Colors | `colors.sh` in either config folder |
 | Menu bar items | `~/.config/sketchybar/sketchybarrc` |
 
@@ -63,8 +63,10 @@ Open the app and click **Uninstall**, or run `./uninstall.sh`. It brings back Ap
 
 - **Menu bar:** a SketchyBar config in `menubar/`.
 - **Dock:** a second SketchyBar instance in `dock/`, started at login by a LaunchAgent. SketchyBar names each instance after the file it starts from, so the dock runs through a link called `mochadock`.
-- **Hover:** the dock steps tiles through exact 2px sizes rather than using SketchyBar's animator, which rounds each property separately and makes the row jitter.
-- **Drag and drop:** SketchyBar can't receive drops, so `dock/dockdrop` is a small native helper. It keeps an invisible window over the dock that only catches drops while a file drag is happening. It also closes the bars' menus when you click elsewhere.
+- **Dock helper:** `dock/dockdrop` is a small native helper that runs alongside the dock.
+  - **Hover:** SketchyBar runs a separate script for every mouse enter and exit, all at once, so quick back-and-forth movement made them land out of order and left the wrong tile grown or a name stuck. The helper checks where the pointer is 60 times a second and sends the dock one update, in order, only when the tile under it changes.
+  - **Drag and drop:** SketchyBar can't receive drops, so the helper keeps an invisible window over the dock that only catches drops while a file drag is happening.
+  - **Menus:** it closes the bars' menus when you click elsewhere.
 - **Installer app:** `app/` holds the installer app, which runs `install.sh` and shows its output.
 
 ## Build from source

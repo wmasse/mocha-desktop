@@ -7,6 +7,13 @@
 //
 // It also closes the bars' menus (the Apple menu and the dock's right-click
 // menus) when you click anywhere outside the bars, like a normal menu.
+//
+// And it runs the dock's hover. SketchyBar starts a separate script for every
+// mouse enter/exit and runs them side by side, so moving quickly back and
+// forth made them land out of order and left the wrong tile grown or a name
+// stuck on screen. Instead, this helper checks where the pointer is 60 times
+// a second and, only when the tile under it changes, sends the dock one
+// update, in order, from this one process.
 
 import AppKit
 
@@ -104,8 +111,6 @@ func closeMenusIfClickedOutside() {
 
 final class DropView: NSView {
     var tiles: [Tile] = []
-    private var highlighted: String?
-
     override init(frame: NSRect) {
         super.init(frame: frame)
         registerForDraggedTypes([.fileURL])
@@ -117,18 +122,9 @@ final class DropView: NSView {
         return tiles.first { x >= $0.minX && x <= $0.maxX }
     }
 
-    /// Reuse the dock's own hover so the tile under the drag grows like on mouse-over
-    private func highlight(_ item: String?) {
-        guard item != highlighted else { return }
-        let hover = configDir + "/plugins/tile.sh"
-        if let old = highlighted { run("/bin/bash", [hover], extraEnv: ["NAME": old, "SENDER": "mouse.exited"]) }
-        if let new = item { run("/bin/bash", [hover], extraEnv: ["NAME": new, "SENDER": "mouse.entered"]) }
-        highlighted = item
-    }
-
+    // The tile under the drag grows through the normal hover, which follows the pointer
     private func operation(for info: NSDraggingInfo) -> NSDragOperation {
-        guard let t = tile(at: info) else { highlight(nil); return [] }
-        highlight(t.item)
+        guard let t = tile(at: info) else { return [] }
         return t.app == nil ? .move : .copy
     }
 
@@ -137,11 +133,8 @@ final class DropView: NSView {
         return operation(for: info)
     }
     override func draggingUpdated(_ info: NSDraggingInfo) -> NSDragOperation { operation(for: info) }
-    override func draggingExited(_ info: NSDraggingInfo?) { highlight(nil) }
-    override func draggingEnded(_ info: NSDraggingInfo) { highlight(nil) }
 
     override func performDragOperation(_ info: NSDraggingInfo) -> Bool {
-        defer { highlight(nil) }
         guard let t = tile(at: info),
               let urls = info.draggingPasteboard.readObjects(
                 forClasses: [NSURL.self],
@@ -158,12 +151,144 @@ final class DropView: NSView {
     }
 }
 
+/// Grows the tile under the pointer and shows its name; every other tile rests
+/// with its name hidden. A hovered tile grows into its own padding, so the
+/// tiles next to it don't move.
+final class Hover {
+    private struct Sizes { var tile = 52, gap = 4, radius = 15 }
+    private struct Spot { let item: String; let midX: CGFloat }
+
+    private var spots: [Spot] = []
+    private var sizes = Sizes()
+    private var barTop: CGFloat = 0, barBottom: CGFloat = 0, barShown = false
+    private var signature = ""        // what the tile positions were read for
+    private var settle = false        // read positions once more after a change
+    private var wanted: String?       // tile under the pointer (main thread)
+    private var latest: String?       // newest tile asked for (under lock)
+    private var applied: String?? = .none   // what the dock last showed; .none = unknown
+
+    private let geometryQueue = DispatchQueue(label: "hover.geometry")
+    private let applyQueue = DispatchQueue(label: "hover.apply")
+    private let lock = NSLock()
+    private var pending = false
+
+    func start() {
+        refreshGeometry()
+        // Positions only change on a reload, an app move, or the full-screen slide
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.refreshGeometry() }
+        let poll = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.poll() }
+        RunLoop.main.add(poll, forMode: .common)   // keep running during drags and menus
+    }
+
+    private func refreshGeometry() {
+        geometryQueue.async { [self] in
+            guard let bar = try? JSONSerialization.jsonObject(with: run(barCommand, ["--query", "bar"])) as? [String: Any],
+                  let height = bar["height"] as? Int, let yOffset = bar["y_offset"] as? Int else { return }
+            let items = (bar["items"] as? [String] ?? []).joined(separator: ",")
+            let appsDate = (try? FileManager.default.attributesOfItem(atPath: configDir + "/apps.txt")[.modificationDate] as? Date)?
+                .timeIntervalSince1970 ?? 0
+            let sig = "\(items)|\(bar["margin"] ?? "")|\(appsDate)"
+
+            var newSpots: [Spot]?
+            var newSizes: Sizes?
+            if sig != signature || settle {
+                settle = sig != signature   // layout may not be final yet; read again next time
+                signature = sig
+                newSpots = loadTiles().map { Spot(item: $0.item, midX: ($0.minX + $0.maxX) / 2) }
+                newSizes = readSizes()
+            }
+            let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+            let shown = (bar["hidden"] as? String) != "on" && (bar["drawing"] as? String) != "off"
+            DispatchQueue.main.async { [self] in
+                barBottom = screenHeight - CGFloat(yOffset)   // top-left origin, like the tile positions
+                barTop = barBottom - CGFloat(height)
+                barShown = shown
+                if let newSpots {
+                    spots = newSpots
+                    lock.lock()
+                    if let newSizes { sizes = newSizes }
+                    applied = .none   // the dock may have reloaded: redraw it
+                    lock.unlock()
+                    request(wanted)
+                }
+            }
+        }
+    }
+
+    private func readSizes() -> Sizes {
+        let out = run("/bin/bash", ["-c", "source \"$CONFIG_DIR/sizes.sh\"; echo $TILE $TILE_GAP $TILE_RADIUS"])
+        let n = (String(data: out, encoding: .utf8) ?? "").split(separator: " ").compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        guard n.count == 3 else { return Sizes() }
+        return Sizes(tile: n[0], gap: n[1], radius: n[2])
+    }
+
+    private func poll() {
+        let mouse = NSEvent.mouseLocation
+        let y = (NSScreen.screens.first?.frame.height ?? 0) - mouse.y
+        var item: String?
+        if barShown && y >= barTop && y <= barBottom {
+            let half = CGFloat(sizes.tile / 2 + sizes.gap)   // a tile plus its padding: no dead gaps
+            item = spots.first { abs(mouse.x - $0.midX) <= half }?.item
+        }
+        guard item != wanted else { return }
+        wanted = item
+        request(item)
+    }
+
+    /// Updates go out one at a time; while one is running, only the newest wish is kept
+    private func request(_ item: String?) {
+        lock.lock()
+        latest = item
+        let start = !pending
+        pending = true
+        lock.unlock()
+        if start { applyQueue.async { [self] in drain() } }
+    }
+
+    private func drain() {
+        while true {
+            lock.lock()
+            let target = latest
+            if case .some(let shown) = applied, shown == target { pending = false; lock.unlock(); return }
+            let s = sizes
+            lock.unlock()
+            show(target, s)
+            lock.lock(); applied = .some(target); lock.unlock()
+        }
+    }
+
+    private func size(_ step: Int, _ s: Sizes) -> [String] {
+        let size = s.tile + 2 * step, pad = s.gap - step
+        return ["icon.width=\(size)", "padding_left=\(pad)", "padding_right=\(pad)",
+                "background.height=\(size)", "background.corner_radius=\(s.radius + step / 2)"]
+    }
+
+    private func show(_ item: String?, _ s: Sizes) {
+        let menuFile = "/tmp/mochadock-\(NSUserName())/menu-open"
+        var openMenu = (try? String(contentsOfFile: menuFile, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var args = ["--set", "/app\\..*/"] + size(0, s) + ["popup.drawing=off",
+                    "--set", "trash"] + size(0, s) + ["popup.drawing=off"]
+        // Hovering another tile closes an open right-click menu
+        if !openMenu.isEmpty, let item, item != openMenu {
+            args += ["--remove", "/menu\\..*/"]
+            try? FileManager.default.removeItem(atPath: menuFile)
+            openMenu = ""
+        }
+        // An open right-click menu stays up so the pointer can move into it
+        if !openMenu.isEmpty { args += ["--set", openMenu, "popup.drawing=on"] }
+        if let item { args += ["--set", item] + size(s.gap, s) + ["popup.drawing=on"] }
+        run(barCommand, args)
+    }
+}
+
 final class Helper: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private var view: DropView!
     private let dragBoard = NSPasteboard(name: .drag)
     private var restingChangeCount = 0
     private var catching = false
+    private let hover = Hover()
 
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -183,6 +308,8 @@ final class Helper: NSObject, NSApplicationDelegate {
         NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
             closeMenusIfClickedOutside()
         }
+
+        hover.start()
 
         // Watch for file drags 20 times a second; this is cheap and needs no permissions
         Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.tick() }
