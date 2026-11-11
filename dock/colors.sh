@@ -1,17 +1,12 @@
 #!/bin/bash
-# Catppuccin Mocha palette (0xAARRGGBB)
-export BASE=0xff1e1e2e
-export SURFACE0=0xff313244
-export SURFACE1=0xff45475a
-export OVERLAY=0xff9399b2
-export TEXT=0xffcdd6f4
-export PINK=0xfff5c2e7
-export PEACH=0xfffab387
-export GREEN=0xffa6e3a1
-export TEAL=0xff94e2d5
-export YELLOW=0xfff9e2af
-export BLUE=0xff89b4fa
-export LAVENDER=0xffb4befe
-export MAUVE=0xffcba6f7
-export RED=0xfff38ba8
+# Colors for the dock and the menu bar (the menu bar's colors.sh sources this).
+# They come from the theme named in theme.txt (one of themes/*.sh), plus any
+# colors you picked for that theme (custom-<theme>.sh). Change both with
+# right-click → Theme… on any tile. Catppuccin Mocha if unset.
+THEME_DIR="${THEME_DIR:-$HOME/.config/sketchybar-dock}"
+THEME="$(cat "$THEME_DIR/theme.txt" 2>/dev/null)"
+[ -f "$THEME_DIR/themes/$THEME.sh" ] || THEME=mocha
+source "$THEME_DIR/themes/$THEME.sh"
+[ -f "$THEME_DIR/custom-$THEME.sh" ] && source "$THEME_DIR/custom-$THEME.sh"
+export THEME
 export TRANSPARENT=0x00000000

@@ -109,8 +109,19 @@ func closeMenusIfClickedOutside() {
     }
 }
 
+/// Open files with a tile's app, or move them to the Trash for the trash tile
+func drop(_ urls: [URL], on tile: Tile, how: String) {
+    log("dropped \(urls.count) file(s) on \(tile.item) (\(how))")
+    if let app = tile.app {
+        NSWorkspace.shared.open(urls, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+    } else {
+        for url in urls { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+    }
+}
+
 final class DropView: NSView {
     var tiles: [Tile] = []
+    var handled = false   // the drop for the current drag already happened
     override init(frame: NSRect) {
         super.init(frame: frame)
         registerForDraggedTypes([.fileURL])
@@ -135,18 +146,13 @@ final class DropView: NSView {
     override func draggingUpdated(_ info: NSDraggingInfo) -> NSDragOperation { operation(for: info) }
 
     override func performDragOperation(_ info: NSDraggingInfo) -> Bool {
-        guard let t = tile(at: info),
+        guard !handled, let t = tile(at: info),
               let urls = info.draggingPasteboard.readObjects(
                 forClasses: [NSURL.self],
                 options: [.urlReadingFileURLsOnly: true]) as? [URL],
               !urls.isEmpty else { return false }
-
-        log("dropped \(urls.count) file(s) on \(t.item)")
-        if let app = t.app {
-            NSWorkspace.shared.open(urls, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
-        } else {
-            for url in urls { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
-        }
+        handled = true
+        drop(urls, on: t, how: "drop")
         return true
     }
 }
@@ -165,6 +171,7 @@ final class Hover {
     private var settle = false        // read positions once more after a change
     private var wanted: String?       // tile under the pointer (main thread)
     private var latest: String?       // newest tile asked for (under lock)
+    private var allItems: [String] = []   // every tile, for redrawing one by one (under lock)
     private var applied: String?? = .none   // what the dock last showed; .none = unknown
 
     private let geometryQueue = DispatchQueue(label: "hover.geometry")
@@ -178,6 +185,13 @@ final class Hover {
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.refreshGeometry() }
         let poll = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(poll, forMode: .common)   // keep running during drags and menus
+    }
+
+    /// Where each tile sits now, padding included (main thread)
+    func currentSpots() -> [(item: String, minX: CGFloat, maxX: CGFloat)] {
+        lock.lock(); let s = sizes; lock.unlock()
+        let half = CGFloat(s.tile / 2 + s.gap)
+        return spots.map { ($0.item, $0.midX - half, $0.midX + half) }
     }
 
     private func refreshGeometry() {
@@ -206,6 +220,7 @@ final class Hover {
                 if let newSpots {
                     spots = newSpots
                     lock.lock()
+                    allItems = newSpots.map(\.item)
                     if let newSizes { sizes = newSizes }
                     applied = .none   // the dock may have reloaded: redraw it
                     lock.unlock()
@@ -267,17 +282,26 @@ final class Hover {
         let menuFile = "/tmp/mochadock-\(NSUserName())/menu-open"
         var openMenu = (try? String(contentsOfFile: menuFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        var args = ["--set", "/app\\..*/"] + size(0, s) + ["popup.drawing=off",
-                    "--set", "trash"] + size(0, s) + ["popup.drawing=off"]
+        var args: [String] = []
         // Hovering another tile closes an open right-click menu
         if !openMenu.isEmpty, let item, item != openMenu {
-            args += ["--remove", "/menu\\..*/"]
+            args += ["--set", openMenu, "popup.drawing=off", "--remove", "/menu\\..*/"]
             try? FileManager.default.removeItem(atPath: menuFile)
             openMenu = ""
         }
-        // An open right-click menu stays up so the pointer can move into it
-        if !openMenu.isEmpty { args += ["--set", openMenu, "popup.drawing=on"] }
-        if let item { args += ["--set", item] + size(s.gap, s) + ["popup.drawing=on"] }
+        lock.lock(); let tiles = allItems; lock.unlock()
+        // Tile by tile, so an open menu is never switched off and back on (that
+        // made it flicker whenever the pointer moved toward it)
+        for tile in tiles.isEmpty ? ["/app\\..*/", "trash"] : tiles {
+            if tile == item {
+                args += ["--set", tile] + size(s.gap, s) + ["popup.drawing=on"]
+            } else if tile == openMenu {
+                args += ["--set", tile] + size(0, s)   // its menu stays up for the pointer to reach
+            } else {
+                args += ["--set", tile] + size(0, s) + ["popup.drawing=off"]
+            }
+        }
+        if tiles.isEmpty, let item { args += ["--set", item] + size(s.gap, s) + ["popup.drawing=on"] }
         run(barCommand, args)
     }
 }
@@ -318,7 +342,10 @@ final class Helper: NSObject, NSApplicationDelegate {
     private func tick() {
         let buttonDown = NSEvent.pressedMouseButtons & 1 != 0
         if !buttonDown {
-            if catching { stopCatching() }
+            if catching {
+                dropWherePointerIs()
+                stopCatching()
+            }
             restingChangeCount = dragBoard.changeCount
             return
         }
@@ -331,8 +358,38 @@ final class Helper: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Backup for the drop itself: since macOS 27 the drop window isn't always told
+    /// about the drag, so when the button comes up over a tile, read the dragged
+    /// files and act on them here. Does nothing if the real drop already happened.
+    private func dropWherePointerIs() {
+        guard !view.handled else { return }
+        let mouse = NSEvent.mouseLocation
+        guard window.frame.contains(mouse),
+              let tile = view.tiles.first(where: { mouse.x >= $0.minX && mouse.x <= $0.maxX }),
+              let urls = dragBoard.readObjects(forClasses: [NSURL.self],
+                                               options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              !urls.isEmpty else { return }
+        view.handled = true
+        drop(urls, on: tile, how: "release over tile")
+    }
+
+    /// Tile positions from the hover (kept current, so this is instant), with each
+    /// tile's app from apps.txt; asks SketchyBar only if the hover has none yet
+    private func currentTiles() -> [Tile] {
+        let spots = hover.currentSpots()
+        guard !spots.isEmpty,
+              let text = try? String(contentsOfFile: configDir + "/apps.txt", encoding: .utf8) else { return loadTiles() }
+        var apps: [String: URL] = [:]
+        for line in text.split(separator: "\n") where !line.hasPrefix("#") {
+            let fields = line.split(separator: "|", omittingEmptySubsequences: false)
+            if fields.count >= 2 { apps["app." + fields[0]] = URL(fileURLWithPath: String(fields[1])) }
+        }
+        return spots.map { Tile(item: $0.item, app: apps[$0.item], minX: $0.minX, maxX: $0.maxX) }
+    }
+
     private func startCatching() {
-        let tiles = loadTiles()
+        let tiles = currentTiles()
+        view.handled = false
         guard let screen = NSScreen.main, let first = tiles.first, let last = tiles.last else {
             log("no tile positions from SketchyBar; not catching")
             return

@@ -23,12 +23,14 @@ lid_wanted() { [ -f "$LID_FILE" ]; }
 
 case "$1" in
   menu)
-    # Set the opposite of what's showing; a plain toggle can get out of step
+    # Set the opposite of what's showing; a plain toggle can get out of step.
+    # Opening waits for the refresh below, so the menu appears already filled in
+    # instead of jumping as its rows update.
     if sketchybar --query $ITEM | grep -A3 '"popup"' | grep -q '"drawing": "on"'; then
       sketchybar --set $ITEM popup.drawing=off
-    else
-      sketchybar --set $ITEM popup.drawing=on
+      exit 0
     fi
+    OPEN_MENU=1
     ;;
   start)
     if [ -n "$3" ]; then
@@ -59,37 +61,39 @@ esac
 
 ARGS=()
 ACTIVE="$(amphetamine 'return session is active')"
+tint() { echo "0x33${1#0xff}"; }   # a see-through version of a color, for chips
 
-# Cup and status line
+# Cup and status chip
 if [ "$ACTIVE" = "true" ]; then
   LEFT="$(amphetamine 'return session time remaining')"
-  STATUS="Keeping awake"
   if [ "${LEFT:-0}" -gt 0 ]; then
     H=$(( LEFT / 3600 )); M=$(( (LEFT % 3600 + 59) / 60 ))
     [ "$M" -eq 60 ] && { H=$(( H + 1 )); M=0; }
-    if [ "$H" -gt 0 ]; then STATUS+=" · ${H}h ${M}m left"; else STATUS+=" · ${M}m left"; fi
+    if [ "$H" -gt 0 ]; then STATUS="Awake · ${H}h ${M}m left"; else STATUS="Awake · ${M}m left"; fi
   else
-    STATUS+=" · until you turn it off"
+    STATUS="Awake · until you turn it off"
   fi
-  [ "$(amphetamine 'return closed display mode enabled')" = "true" ] && STATUS+=" · lid ok"
   ARGS+=(--set $ITEM icon="$G_AWAKE" icon.color=$PEACH
          --set $ITEM.title icon="$G_AWAKE" icon.color=$PEACH
-         --set $ITEM.status label="$STATUS" label.color=$PEACH
+         --set $ITEM.status label="$STATUS" label.color=$PEACH label.background.color="$(tint $PEACH)"
+         --set $ITEM.rule3 drawing=on
          --set $ITEM.off drawing=on)
 else
   rm -f "$CHOICE_FILE"
   ARGS+=(--set $ITEM icon="$G_AWAKE_OFF" icon.color=$OVERLAY
          --set $ITEM.title icon="$G_AWAKE_OFF" icon.color=$OVERLAY
-         --set $ITEM.status label="Off · your Mac sleeps as usual" label.color=$OVERLAY
+         --set $ITEM.status label="Off · sleeps as usual" label.color=$OVERLAY label.background.color="$(tint $OVERLAY)"
+         --set $ITEM.rule3 drawing=off
          --set $ITEM.off drawing=off)
 fi
 
-# Lid switch, and a warning when it would run the battery down
+# Lid switch, and a warning chip when it would run the battery down
 if lid_wanted; then
   ARGS+=(--set $ITEM.lid icon="$G_TOGGLE_ON" icon.color=$GREEN label.color=$TEXT)
   if pmset -g batt | grep -q "Battery Power"; then
     PERCENT="$(pmset -g batt | grep -o '[0-9]*%' | head -1)"
-    ARGS+=(--set $ITEM.warning drawing=on label="On battery (${PERCENT:-?}) · plug in first")
+    ARGS+=(--set $ITEM.warning drawing=on label="On battery ${PERCENT:-} · plug in first"
+                 label.color=$YELLOW label.background.color="$(tint $YELLOW)")
   else
     ARGS+=(--set $ITEM.warning drawing=off)
   fi
@@ -98,11 +102,11 @@ else
          --set $ITEM.warning drawing=off)
 fi
 
-# Check mark on the option that's running
+# The option that's running gets a green check
 CHOICE="$(cat "$CHOICE_FILE" 2>/dev/null)"
 for key in $OPTIONS; do
   if [ "$ACTIVE" = "true" ] && [ "$key" = "$CHOICE" ]; then
-    ARGS+=(--set $ITEM.$key icon="$G_CHECK" icon.color=$GREEN label.color=$TEXT)
+    ARGS+=(--set $ITEM.$key icon="$G_CHECK" icon.color=$GREEN label.color=$GREEN)
   elif [ "$key" = "forever" ]; then
     ARGS+=(--set $ITEM.$key icon="$G_INFINITY" icon.color=$PEACH label.color=$SUBTEXT)
   else
@@ -110,4 +114,5 @@ for key in $OPTIONS; do
   fi
 done
 
+[ -n "$OPEN_MENU" ] && ARGS+=(--set $ITEM popup.drawing=on)
 sketchybar "${ARGS[@]}"

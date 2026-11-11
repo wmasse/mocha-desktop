@@ -1,4 +1,12 @@
 #!/bin/bash
+# The menu bar follows the dock's theme and custom colors (right-click a dock
+# tile → Theme…). Without the dock it uses the Catppuccin Mocha palette below.
+DOCK_COLORS="$HOME/.config/sketchybar-dock/colors.sh"
+if [ -f "$DOCK_COLORS" ]; then
+  source "$DOCK_COLORS"
+  return 0 2>/dev/null || exit 0
+fi
+
 # Catppuccin Mocha palette (0xAARRGGBB)
 export BASE=0xff1e1e2e
 export SURFACE0=0xff313244

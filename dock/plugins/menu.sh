@@ -38,6 +38,24 @@ save_and_reload() {
 
 MENU_FILE="/tmp/mochadock-$USER/menu-open"
 
+# Theme colors you can change from the theme screen; saved per theme
+CUSTOM_FILE="$CONFIG_DIR/custom-$THEME.sh"
+COLOR_ROLES="SURFACE0 SURFACE1 TEXT BASE"
+role_label() {
+  case "$1" in
+    SURFACE0) echo "Tray & menus" ;;
+    SURFACE1) echo "Empty tiles" ;;
+    TEXT)     echo "Text & front-app ring" ;;
+    BASE)     echo "Icons on open apps" ;;
+  esac
+}
+
+# Themes and colors are shared with the menu bar, so redraw both
+reload_bars() {
+  mochadock --reload
+  sketchybar --reload 2>/dev/null
+}
+
 close_menu() {
   mochadock --set "$ITEM" popup.drawing=off --remove '/menu\..*/' 2>/dev/null
   rm -f "$MENU_FILE"
@@ -82,8 +100,71 @@ case "$ACTION" in
       menu_entry add "$G_ADD" $GREEN "Add app here…" add
       menu_entry remove "$G_REMOVE" $RED "Remove from Dock" remove
     fi
+    menu_entry theme "$G_THEME" $MAUVE "Theme…" themes
     mochadock "${MENU[@]}" --set "$ITEM" popup.drawing=on 2>/dev/null
     mkdir -p "$(dirname "$MENU_FILE")" && echo "$ITEM" > "$MENU_FILE"
+    ;;
+
+  themes)
+    # Swap this menu's entries for the themes. Each row is drawn in its own
+    # theme's colors, so the list doubles as a preview.
+    MENU=(--remove '/menu\..*/')
+    menu_entry back "$G_BACK" $OVERLAY "Back" show
+    for file in "$CONFIG_DIR"/themes/*.sh; do
+      NAME_KEY="$(basename "$file" .sh)"
+      read -r T_BASE T_SURFACE T_TEXT T_ACCENT T_NAME <<< \
+        "$(source "$file"; echo "$BASE $SURFACE1 $TEXT $MAUVE $THEME_NAME")"
+      if [ "$NAME_KEY" = "$THEME" ]; then ICON="$G_CHECK"; else ICON="$G_SWATCH"; fi
+      menu_entry "theme_$NAME_KEY" "$ICON" "$T_ACCENT" "$T_NAME" "theme-$NAME_KEY"
+      MENU+=(--set "menu.theme_$NAME_KEY" label.color="$T_TEXT" width=230
+                   background.drawing=on background.color="$T_BASE" background.height=30
+                   background.corner_radius=8 background.border_width=1 background.border_color="$T_SURFACE")
+    done
+
+    # Customize: each row shows its color now; click to pick a new one
+    MENU+=(--add item menu.customize popup."$ITEM"
+           --set menu.customize icon.drawing=off label="CUSTOMIZE ${THEME_NAME}" label.drawing=on
+                 label.color=$OVERLAY label.font.size=11 label.padding_left=10 background.drawing=off
+                 padding_left=8)
+    for role in $COLOR_ROLES; do
+      menu_entry "color_$role" " " "${!role}" "$(role_label "$role")" "color-$role"
+      # The swatch is the icon's own background, outlined so it shows even when
+      # the color matches the menu
+      MENU+=(--set "menu.color_$role" icon.width=18 icon.padding_left=10 icon.padding_right=0
+                   label.padding_left=14
+                   icon.background.drawing=on icon.background.color="${!role}" icon.background.height=18
+                   icon.background.corner_radius=9 icon.background.border_width=1
+                   icon.background.border_color=$OVERLAY)
+    done
+    [ -f "$CUSTOM_FILE" ] && menu_entry reset "$G_RESET" $RED "Reset colors" reset-colors
+    mochadock "${MENU[@]}" 2>/dev/null
+    ;;
+
+  theme-*)
+    echo "${ACTION#theme-}" > "$CONFIG_DIR/theme.txt"
+    close_menu
+    reload_bars
+    ;;
+
+  color-*)
+    ROLE="${ACTION#color-}"
+    close_menu
+    # macOS's color picker, starting from the current color (16-bit channels)
+    HEX="${!ROLE#0xff}"
+    R=$(( 16#${HEX:0:2} * 257 )); G=$(( 16#${HEX:2:2} * 257 )); B=$(( 16#${HEX:4:2} * 257 ))
+    PICKED="$(osascript -e 'activate' -e "choose color default color {$R, $G, $B}" 2>/dev/null)" || exit 0
+    IFS=', ' read -r R G B <<< "$PICKED"
+    NEW="$(printf '0xff%02x%02x%02x' $(( R / 257 )) $(( G / 257 )) $(( B / 257 )))"
+    # Keep one line per color in this theme's custom file
+    { grep -v "^export $ROLE=" "$CUSTOM_FILE" 2>/dev/null; echo "export $ROLE=$NEW"; } > "$CUSTOM_FILE.tmp"
+    mv "$CUSTOM_FILE.tmp" "$CUSTOM_FILE"
+    reload_bars
+    ;;
+
+  reset-colors)
+    rm -f "$CUSTOM_FILE"
+    close_menu
+    reload_bars
     ;;
 
   quit)

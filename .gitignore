@@ -4,3 +4,5 @@ dock/bin/
 dock/apps.txt
 menubar/bin/
 menubar/cache/
+dock/theme.txt
+dock/custom-*.sh

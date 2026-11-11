@@ -107,13 +107,18 @@ if wants dock; then
   LABEL="com.mocha.dock"
   PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
-  # Keep the app list from an earlier install
+  # Keep the app list, theme and custom colors from an earlier install
   SAVED_APPS=""
   if [ -f "$DEST/apps.txt" ]; then SAVED_APPS="$(mktemp)"; cp "$DEST/apps.txt" "$SAVED_APPS"; fi
+  SAVED_LOOK="$(mktemp -d)"
+  cp "$DEST"/theme.txt "$DEST"/custom-*.sh "$SAVED_LOOK/" 2>/dev/null || true
   pkill -f "$DEST/bin/dockdrop" 2>/dev/null || true
   backup "$DEST"
   cp -R "$REPO/dock" "$DEST"
   chmod +x "$DEST/sketchybarrc" "$DEST"/*.sh "$DEST"/plugins/*.sh
+
+  cp "$SAVED_LOOK"/* "$DEST/" 2>/dev/null || true
+  rm -rf "$SAVED_LOOK"
 
   if [ -n "$SAVED_APPS" ]; then
     mv "$SAVED_APPS" "$DEST/apps.txt"

@@ -23,6 +23,9 @@ sketchybar --bar position=top \
                  margin=0 \
                  color=$BASE \
                  topmost=on
+# Put the wallpaper strip back right away (it's saved), so a reload doesn't
+# flash the plain color first
+CONFIG_DIR="$CONFIG_DIR" "$PLUGIN_DIR/wallpaper.sh"
 
 sketchybar --default icon.font="$FONT:Bold:15.0" \
                      label.font="$FONT:Bold:13.0" \
@@ -140,55 +143,61 @@ if [ -d /Applications/Amphetamine.app ]; then
                                popup.align=right \
                                popup.background.color=$SURFACE0 \
                                popup.background.corner_radius=12 \
-                               popup.background.border_width=2 \
-                               popup.background.border_color=$PEACH \
-                               popup.height=30 \
+                               popup.background.border_width=1 \
+                               popup.background.border_color=$SURFACE1 \
+                               popup.background.corner_radius=14 \
+                               popup.height=32 \
              --subscribe amphetamine system_woke $HOVER_EVENTS
 
-  # The menu: a header, the lid switch, how long to stay awake, and Turn off.
-  # Every row is the same width so the hover highlights line up.
-  AMPH_W=290
-  amph_text() { # name label font color — a line of text, not clickable
+  # The menu: a header with a status chip, the lid switch, how long to stay
+  # awake, and Turn off. Every row has the same width and every line of text a
+  # character limit, so nothing can run past the menu's edge.
+  AMPH_W=272
+  amph_chip() { # name — a rounded chip of text (colors are set by amphetamine.sh)
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
-               --set "amphetamine.$1" icon.drawing=off label="$2" label.font="$3" label.color="$4" \
-                     label.padding_left=14 width=$AMPH_W background.drawing=off
+               --set "amphetamine.$1" icon.drawing=off label.font="$FONT:Bold:12.0" label.max_chars=32 \
+                     label.padding_left=10 label.padding_right=10 \
+                     label.background.drawing=on label.background.height=22 label.background.corner_radius=11 \
+                     padding_left=14 width=$AMPH_W background.drawing=off
   }
   amph_rule() { # name — a thin line between sections
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
                --set "amphetamine.$1" icon.drawing=off label.drawing=off width=$AMPH_W \
                      background.drawing=on background.color=$SURFACE1 background.height=1 \
-                     background.corner_radius=0 padding_left=10 padding_right=10
+                     background.corner_radius=0 padding_left=12 padding_right=12
   }
   amph_row() { # name icon color label args — a clickable row that lights up on hover
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
-               --set "amphetamine.$1" icon="$2" icon.color="$3" icon.width=30 icon.padding_left=12 \
-                     label="$4" label.color=$SUBTEXT width=$AMPH_W \
+               --set "amphetamine.$1" icon="$2" icon.color="$3" icon.width=28 icon.padding_left=10 \
+                     label="$4" label.color=$SUBTEXT label.max_chars=26 label.padding_left=6 width=$AMPH_W \
                      background.drawing=on background.color=$SURFACE0 background.height=30 \
-                     background.corner_radius=8 padding_left=6 padding_right=6 \
+                     background.corner_radius=9 padding_left=6 padding_right=6 \
                      script="$PLUGIN_DIR/row.sh" click_script="$AMPH $5" \
                --subscribe "amphetamine.$1" $HOVER_EVENTS
   }
 
   sketchybar --add item amphetamine.title popup.amphetamine \
-             --set amphetamine.title icon="$G_AWAKE_OFF" icon.font="$FONT:Bold:20.0" icon.padding_left=14 \
-                                     label="Amphetamine" label.font="$FONT:Bold:15.0" label.color=$TEXT \
-                                     width=$AMPH_W background.drawing=off
-  amph_text status "Off" "$FONT:Regular:12.0" $OVERLAY
+             --set amphetamine.title icon="$G_AWAKE_OFF" icon.font="$FONT:Bold:18.0" icon.padding_left=16 \
+                                     icon.padding_right=8 label="Amphetamine" label.font="$FONT:Bold:15.0" \
+                                     label.color=$TEXT width=$AMPH_W background.drawing=off
+  amph_chip status
   amph_rule rule1
-  amph_row  lid     "$G_TOGGLE_OFF" $OVERLAY "Stay awake with lid closed" "lid"
-  sketchybar --set amphetamine.lid icon.font="$FONT:Bold:22.0"
-  sketchybar --add item amphetamine.warning popup.amphetamine \
-             --set amphetamine.warning icon="$G_BATT_ALERT" icon.color=$YELLOW icon.width=30 icon.padding_left=18 \
-                                       label.font="$FONT:Regular:12.0" label.color=$YELLOW \
-                                       width=$AMPH_W background.drawing=off drawing=off
+  amph_row  lid     "$G_TOGGLE_OFF" $OVERLAY "Stay awake, lid closed" "lid"
+  sketchybar --set amphetamine.lid icon.font="$FONT:Bold:20.0" icon.width=30
+  amph_chip warning
+  sketchybar --set amphetamine.warning drawing=off
   amph_rule rule2
-  amph_text section "KEEP AWAKE FOR" "$FONT:Bold:11.0" $OVERLAY
+  sketchybar --add item amphetamine.section popup.amphetamine \
+             --set amphetamine.section icon.drawing=off label="KEEP AWAKE FOR" label.font="$FONT:Bold:11.0" \
+                                       label.color=$OVERLAY label.padding_left=16 width=$AMPH_W background.drawing=off
   amph_row  forever "$G_INFINITY" $PEACH  "Until I turn it off" "start forever"
   amph_row  30m     "$G_TIMER"    $YELLOW "30 minutes"          "start 30m 30 minutes"
   amph_row  1h      "$G_TIMER"    $YELLOW "1 hour"              "start 1h 1 hours"
   amph_row  2h      "$G_TIMER"    $YELLOW "2 hours"             "start 2h 2 hours"
   amph_row  4h      "$G_TIMER"    $YELLOW "4 hours"             "start 4h 4 hours"
+  amph_rule rule3
   amph_row  off     "$G_AWAKE_OFF" $RED   "Turn off"            "off"
+  sketchybar --set amphetamine.off label.color=$RED
 fi
 
 # Invisible item that keeps the strip matching the wallpaper

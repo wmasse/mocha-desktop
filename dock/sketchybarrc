@@ -43,6 +43,7 @@ mochadock --default icon.font="$FONT:Bold:$TILE_FONT.0" \
                     padding_left=$TILE_GAP \
                     padding_right=$TILE_GAP \
                     popup.align=center \
+                    popup.height=34 \
                     popup.background.color=$SURFACE0 \
                     popup.background.corner_radius=14 \
                     popup.background.border_width=1 \

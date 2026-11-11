@@ -13,11 +13,12 @@ DEVICE="${DEVICE:-en0}"
 
 case "$1" in
   menu)
+    # Opening waits for the refresh below, so the menu appears already filled in
     if sketchybar --query $ITEM | grep -A3 '"popup"' | grep -q '"drawing": "on"'; then
       sketchybar --set $ITEM popup.drawing=off
-    else
-      sketchybar --set $ITEM popup.drawing=on
+      exit 0
     fi
+    OPEN_MENU=1
     ;;
   power)
     if networksetup -getairportpower "$DEVICE" | grep -q ': On'; then
@@ -34,18 +35,21 @@ networksetup -getairportpower "$DEVICE" | grep -q ': On' && POWER_ON=true
 ADDRESS="$(ipconfig getifaddr "$DEVICE")"
 
 if [ -n "$ADDRESS" ]; then
-  sketchybar --set $ITEM icon="$G_WIFI" icon.color=$GREEN \
-             --set $ITEM.status label="Connected · $ADDRESS"
+  ARGS=(--set $ITEM icon="$G_WIFI" icon.color=$GREEN
+        --set $ITEM.status label="Connected · $ADDRESS")
 elif [ "$POWER_ON" = true ]; then
-  sketchybar --set $ITEM icon="$G_WIFI_OFF" icon.color=$RED \
-             --set $ITEM.status label="Not connected"
+  ARGS=(--set $ITEM icon="$G_WIFI_OFF" icon.color=$RED
+        --set $ITEM.status label="Not connected")
 else
-  sketchybar --set $ITEM icon="$G_WIFI_OFF" icon.color=$RED \
-             --set $ITEM.status label="Wi-Fi is off"
+  ARGS=(--set $ITEM icon="$G_WIFI_OFF" icon.color=$RED
+        --set $ITEM.status label="Wi-Fi is off")
 fi
 
 if [ "$POWER_ON" = true ]; then
-  sketchybar --set $ITEM.power label="Turn Wi-Fi Off" icon.color=$RED
+  ARGS+=(--set $ITEM.power label="Turn Wi-Fi Off" icon.color=$RED)
 else
-  sketchybar --set $ITEM.power label="Turn Wi-Fi On" icon.color=$GREEN
+  ARGS+=(--set $ITEM.power label="Turn Wi-Fi On" icon.color=$GREEN)
 fi
+
+[ -n "$OPEN_MENU" ] && ARGS+=(--set $ITEM popup.drawing=on)
+sketchybar "${ARGS[@]}"
