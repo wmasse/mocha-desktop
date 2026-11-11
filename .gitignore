@@ -2,3 +2,5 @@ dist/
 .DS_Store
 dock/bin/
 dock/apps.txt
+menubar/bin/
+menubar/cache/

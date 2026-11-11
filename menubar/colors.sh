@@ -4,6 +4,7 @@ export BASE=0xff1e1e2e
 export SURFACE0=0xff313244
 export SURFACE1=0xff45475a
 export OVERLAY=0xff9399b2
+export SUBTEXT=0xffbac2de
 export TEXT=0xffcdd6f4
 export PINK=0xfff5c2e7
 export PEACH=0xfffab387

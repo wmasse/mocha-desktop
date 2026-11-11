@@ -50,7 +50,7 @@ enum Part: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .menubar: return "Floating pastel pills. The notch stays clear."
+        case .menubar: return "Pastel pills on a strip of your own wallpaper."
         case .dock: return "Squircle tiles from your current Dock, with drag and drop."
         case .gaps: return "Double-click a title bar to fill the space between the bars."
         case .wallpaper: return "A solid Mocha background to match."

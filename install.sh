@@ -32,15 +32,73 @@ fi
 if wants menubar; then
   step "Menu bar"
   DEST="$HOME/.config/sketchybar"
+  LABEL="com.mocha.menubar"
+  PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+  pkill -fx "$DEST/bin/barclick" 2>/dev/null || true
   backup "$DEST"
   mkdir -p "$HOME/.config"
   cp -R "$REPO/menubar" "$DEST"
+  rm -rf "$DEST/cache"
   chmod +x "$DEST/sketchybarrc" "$DEST"/*.sh "$DEST"/plugins/*.sh
-  brew services restart sketchybar
-  # Hide Apple's menu bar so the Mocha one takes its place (it still slides down at the top edge)
+  mkdir -p "$DEST/bin"
+  CAN_BUILD=false
+  { command -v swiftc >/dev/null || xcrun --find swiftc >/dev/null 2>&1; } && CAN_BUILD=true
+
+  # Menu helper (menus, volume, the wallpaper strip, Control-Option-Command-M):
+  # use the prebuilt one if this copy has it, else build it
+  if [ -x "$REPO/menubar/bin/barclick" ]; then
+    cp "$REPO/menubar/bin/barclick" "$DEST/bin/barclick"
+  elif $CAN_BUILD; then
+    "$REPO/scripts/swift-build.sh" "$DEST/bin/barclick" native "$REPO/menubar/barclick/main.swift" || echo "    couldn't build the menu helper; some menus and the volume pill won't work"
+  else
+    echo "    skipped the menu helper (needs Xcode Command Line Tools: xcode-select --install)"
+  fi
+
+  # The Mocha build of SketchyBar draws the bar above Apple's auto-hidden menu bar
+  # (see scripts/build-sketchybar.sh); stock SketchyBar works too, but Apple's bar
+  # can then take clicks meant for the pills
+  if [ -x "$REPO/menubar/bin/sketchybar" ]; then
+    cp "$REPO/menubar/bin/sketchybar" "$DEST/bin/sketchybar"
+  elif ! { $CAN_BUILD && "$REPO/scripts/build-sketchybar.sh" "$DEST/bin/sketchybar" native; }; then
+    ln -sf "$(brew --prefix)/bin/sketchybar" "$DEST/bin/sketchybar"
+    echo "    using stock SketchyBar; Apple's menu bar may cover the pills when it slides down"
+  fi
+
+  # Run the bar from that copy instead of Homebrew's service, so upgrades don't swap it out
+  brew services stop sketchybar >/dev/null 2>&1 || true
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+  cat > "$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$DEST/bin/sketchybar</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CONFIG_DIR</key><string>$DEST</string>
+    <key>LANG</key><string>en_US.UTF-8</string>
+    <key>PATH</key><string>$(brew --prefix)/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/mocha-menubar.log</string>
+</dict>
+</plist>
+PLIST
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+  # Hide Apple's menu bar so the Mocha one takes its place (it still slides down
+  # under the Mocha bar; Control-Option-Command-M steps the Mocha bar aside)
   defaults write NSGlobalDomain _HIHideMenuBar -bool true
   echo "    If Apple's menu bar still shows, set System Settings → Control Center →"
   echo "    \"Automatically hide and show the menu bar\" to Always."
+  echo "    Press Control-Option-Command-M any time to use Apple's menu bar."
 fi
 
 if wants dock; then
@@ -117,12 +175,12 @@ fi
 if wants gaps; then
   step "Window gaps (Rectangle)"
   brew list --cask rectangle >/dev/null 2>&1 || brew install --cask rectangle
-  # Even 8pt gap around zoomed windows: menu bar pills end 33pt down, the dock tray
-  # starts 90pt up. Notched screens already keep their top strip clear, so subtract it.
+  # Even 8pt gap around zoomed windows: the menu bar strip ends 38pt down, the dock
+  # tray starts 90pt up. Notched screens already keep their top strip clear, so subtract it.
   NOTCH="$(osascript -l JavaScript -e 'ObjC.import("AppKit"); var s=$.NSScreen.screens.objectAtIndex(0); var t=0; try { t=s.safeAreaInsets.top } catch(e) {}; Math.round(t)' 2>/dev/null || echo 0)"
   R=com.knollsoft.Rectangle
-  defaults write $R screenEdgeGapTop -int 41
-  defaults write $R screenEdgeGapTopNotch -int $(( 41 - ${NOTCH:-0} > 0 ? 41 - ${NOTCH:-0} : 8 ))
+  defaults write $R screenEdgeGapTop -int 46
+  defaults write $R screenEdgeGapTopNotch -int $(( 46 - ${NOTCH:-0} > 0 ? 46 - ${NOTCH:-0} : 8 ))
   defaults write $R screenEdgeGapBottom -int 98
   defaults write $R screenEdgeGapLeft -int 8
   defaults write $R screenEdgeGapRight -int 8

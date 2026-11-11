@@ -15,6 +15,9 @@ defaults delete com.apple.dock autohide-delay 2>/dev/null
 killall Dock
 
 echo "==> Menu bar"
+launchctl bootout "gui/$(id -u)/com.mocha.menubar" 2>/dev/null
+rm -f "$HOME/Library/LaunchAgents/com.mocha.menubar.plist"
+pkill -fx "$HOME/.config/sketchybar/bin/barclick" 2>/dev/null
 brew services stop sketchybar 2>/dev/null
 [ -d "$HOME/.config/sketchybar" ] && mv "$HOME/.config/sketchybar" "$HOME/.config/sketchybar.removed.$STAMP"
 defaults write NSGlobalDomain _HIHideMenuBar -bool false

@@ -9,11 +9,17 @@
 ## What you get
 
 **Menu bar**
-- Floating pills: Apple menu, current app, volume, Wi‑Fi, battery, and date and time
+- Pastel pills: Apple menu, current app, Amphetamine, volume, Wi‑Fi, battery, and date and time
+- They sit on a strip cut from the top of your own wallpaper (it follows dynamic wallpapers through the day), so the bar blends into the desktop while covering Apple's menu bar
 - The notch stays empty, so apps that live there aren't covered
-- Click the clock for Calendar, battery or Wi‑Fi for their settings
+- Click the current app to hide it, hide the others or quit it
+- Click the clock for Calendar or battery for its settings
+- Click Wi‑Fi for a menu to turn it off or on, or open its settings
 - Click volume to mute; scroll over it to change the volume
-- The Apple menu has Settings, Activity Monitor, Reload bars, Lock screen and Sleep, and closes when you click anywhere else
+- If [Amphetamine](https://apps.apple.com/app/amphetamine/id937984704) is installed, click the cup to keep your Mac awake for a while or until you turn it off, and optionally with the lid closed
+- The Apple menu has Settings, Activity Monitor, Reload bars, Lock screen and Sleep
+- Need Apple's own menu bar (File, Edit…)? Press **Control‑Option‑Command‑M**, or pick **macOS Menu Bar** in the Apple menu. The Mocha bar steps aside and comes back once you're done
+- Menus close when you click anywhere else
 
 **Dock**
 - Squircle tiles in pastel colors, built from the apps already in your Dock
@@ -50,7 +56,7 @@ The installer trusts SketchyBar's official Homebrew tap (`felixkratz/formulae`),
 |---|---|
 | Dock apps, order, icons and colors | Right-click a tile, or edit `~/.config/sketchybar-dock/apps.txt` |
 | Tile and hover size | `~/.config/sketchybar-dock/sizes.sh` |
-| Colors | `colors.sh` in either config folder |
+| Colors | `colors.sh` in either config folder (the menu bar strip takes its colors from your wallpaper) |
 | Menu bar items | `~/.config/sketchybar/sketchybarrc` |
 
 After editing, use **Reload bars** in the Apple menu.
@@ -61,12 +67,14 @@ Open the app and click **Uninstall**, or run `./uninstall.sh`. It brings back Ap
 
 ## How it works
 
-- **Menu bar:** a SketchyBar config in `menubar/`.
+- **Menu bar:** a SketchyBar config in `menubar/`, started at login by a LaunchAgent.
+  - **Above Apple's menu bar:** macOS slides its auto-hidden menu bar down whenever the pointer nears the top, and on macOS 27 it also keeps an invisible window there that takes clicks. Stock SketchyBar can only sit on the same layer, so the menu bar runs a copy built with a one-line change (`menubar/sketchybar/topmost.patch`, built by `scripts/build-sketchybar.sh`) that draws it two layers higher. The bar is a full-width strip, taller than Apple's, so Apple's bar never shows through.
+  - **Menu helper:** `menubar/barclick` is a small native helper. It closes the bar's menus on outside clicks, gives back Apple's menu bar on Control‑Option‑Command‑M, hides or quits the current app, and cuts the wallpaper strip (picking the right image of a dynamic wallpaper for the time of day). It also reads and sets the volume through Core Audio, since AppleScript's volume commands take about a second each on macOS 27.
 - **Dock:** a second SketchyBar instance in `dock/`, started at login by a LaunchAgent. SketchyBar names each instance after the file it starts from, so the dock runs through a link called `mochadock`.
 - **Dock helper:** `dock/dockdrop` is a small native helper that runs alongside the dock.
   - **Hover:** SketchyBar runs a separate script for every mouse enter and exit, all at once, so quick back-and-forth movement made them land out of order and left the wrong tile grown or a name stuck. The helper checks where the pointer is 60 times a second and sends the dock one update, in order, only when the tile under it changes.
   - **Drag and drop:** SketchyBar can't receive drops, so the helper keeps an invisible window over the dock that only catches drops while a file drag is happening.
-  - **Menus:** it closes the bars' menus when you click elsewhere.
+  - **Menus:** it closes the dock's menus when you click elsewhere.
 - **Installer app:** `app/` holds the installer app, which runs `install.sh` and shows its output.
 
 ## Build from source
@@ -79,4 +87,4 @@ This produces `dist/Mocha Desktop.app` and `dist/Mocha-Desktop.zip` (universal, 
 
 ## Credits
 
-Colors from [Catppuccin](https://github.com/catppuccin/catppuccin) (MIT). Bars by [SketchyBar](https://github.com/FelixKratz/SketchyBar). Window gaps by [Rectangle](https://github.com/rxhanson/Rectangle). Icons from [Nerd Fonts](https://www.nerdfonts.com).
+Colors from [Catppuccin](https://github.com/catppuccin/catppuccin) (MIT). Bars by [SketchyBar](https://github.com/FelixKratz/SketchyBar) (GPL-3.0; the menu bar uses a patched build, see `menubar/sketchybar/`). Window gaps by [Rectangle](https://github.com/rxhanson/Rectangle). Icons from [Nerd Fonts](https://www.nerdfonts.com).

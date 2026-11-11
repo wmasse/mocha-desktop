@@ -8,14 +8,21 @@ source "$CONFIG_DIR/glyphs.sh"
 
 FONT="Hack Nerd Font"
 DOCK="$HOME/.config/sketchybar-dock/bin/mochadock"
+BARCLICK="$CONFIG_DIR/bin/barclick"   # helper: menus, volume, wallpaper strip (barclick/main.swift)
 
-# Bar: transparent, floating pills sit on top of it
+# Bar: a strip with the pills on it. macOS slides its auto-hidden menu bar down
+# whenever the pointer nears the top, and nothing can turn that off, so the strip
+# covers it: it's taller than Apple's 33pt bar, and topmost=on (in the Mocha
+# build of SketchyBar, bin/sketchybar) draws it above Apple's bar so the pills
+# get every click. The strip shows the top of your wallpaper (plugins/wallpaper.sh),
+# so it blends into the desktop; the Mocha color is the fallback.
+export BAR_HEIGHT=38
 sketchybar --bar position=top \
-                 height=36 \
-                 y_offset=2 \
-                 margin=6 \
-                 color=$TRANSPARENT \
-                 topmost=off
+                 height=$BAR_HEIGHT \
+                 y_offset=0 \
+                 margin=0 \
+                 color=$BASE \
+                 topmost=on
 
 sketchybar --default icon.font="$FONT:Bold:15.0" \
                      label.font="$FONT:Bold:13.0" \
@@ -56,13 +63,29 @@ menu_item activity "$G_ACTIVITY" $GREEN "Activity Monitor" "open -a 'Activity Mo
 menu_item reload   "$G_RELOAD"   $TEAL  "Reload bars"      "sketchybar --reload; [ -x '$DOCK' ] && '$DOCK' --reload"
 menu_item lock     "$G_LOCK"     $BLUE  "Lock screen"      "pmset displaysleepnow"
 menu_item sleep    "$G_SLEEP"    $PEACH "Sleep"            "pmset sleepnow"
+menu_item menubar  "$G_MENUBAR"  $SUBTEXT "macOS Menu Bar  ⌃⌥⌘M" "'$BARCLICK' menubar"
 
+# Current app; click for a small menu to hide or quit it
 sketchybar --add item front_app left \
            --set front_app icon.drawing=off \
                            label.padding_left=10 \
                            label.max_chars=22 \
                            script="$PLUGIN_DIR/front_app.sh" \
+                           click_script="sketchybar --set front_app popup.drawing=toggle" \
+                           popup.background.color=$SURFACE0 \
+                           popup.background.corner_radius=12 \
+                           popup.background.border_width=2 \
+                           popup.background.border_color=$LAVENDER \
            --subscribe front_app front_app_switched
+
+app_item() { # name icon color label action
+  sketchybar --add item "front_app.$1" popup.front_app \
+             --set "front_app.$1" icon="$2" icon.color="$3" label="$4" background.drawing=off \
+                   click_script="sketchybar --set front_app popup.drawing=off; '$BARCLICK' $5"
+}
+app_item hide   "$G_HIDE" $LAVENDER "Hide"        hide
+app_item others "$G_HIDE" $LAVENDER "Hide Others" hide-others
+app_item quit   "$G_QUIT" $RED      "Quit"        quit
 
 # The notch is left empty on purpose so apps that live there (like Mantle) have it to themselves.
 
@@ -79,17 +102,104 @@ sketchybar --add item battery right \
                          click_script="open 'x-apple.systempreferences:com.apple.Battery-Settings.extension'" \
            --subscribe battery system_woke power_source_change $HOVER_EVENTS
 
+# Wi-Fi: click for a menu to turn it off or on, or open Wi-Fi settings
+WIFI="CONFIG_DIR=$CONFIG_DIR NAME=wifi $PLUGIN_DIR/wifi.sh"
 sketchybar --add item wifi right \
            --set wifi label.drawing=off icon.padding_right=10 \
                       update_freq=30 script="$PLUGIN_DIR/wifi.sh" \
-                      click_script="open 'x-apple.systempreferences:com.apple.wifi-settings-extension'" \
-           --subscribe wifi wifi_change system_woke $HOVER_EVENTS
+                      click_script="$WIFI menu" \
+                      popup.align=right \
+                      popup.background.color=$SURFACE0 \
+                      popup.background.corner_radius=12 \
+                      popup.background.border_width=2 \
+                      popup.background.border_color=$GREEN \
+           --subscribe wifi wifi_change system_woke $HOVER_EVENTS \
+           --add item wifi.status popup.wifi \
+           --set wifi.status icon.drawing=off label.color=$OVERLAY \
+                             label.padding_left=10 background.drawing=off \
+           --add item wifi.power popup.wifi \
+           --set wifi.power icon="$G_WIFI_OFF" background.drawing=off click_script="$WIFI power" \
+           --add item wifi.settings popup.wifi \
+           --set wifi.settings icon="$G_GEAR" icon.color=$MAUVE label="Wi-Fi Settings…" background.drawing=off \
+                               click_script="sketchybar --set wifi popup.drawing=off; open 'x-apple.systempreferences:com.apple.wifi-settings-extension'"
 
 # Click to mute or unmute, scroll over it to change the volume
 sketchybar --add item volume right \
            --set volume icon.color=$BLUE label.color=$BLUE \
                         script="$PLUGIN_DIR/volume.sh" \
-                        click_script="osascript -e 'set volume output muted not (output muted of (get volume settings))'; SENDER=forced $PLUGIN_DIR/volume.sh" \
+                        click_script="CONFIG_DIR=$CONFIG_DIR NAME=volume $PLUGIN_DIR/volume.sh mute" \
            --subscribe volume volume_change mouse.scrolled $HOVER_EVENTS
 
+# Amphetamine: click the cup for a menu to keep the Mac awake for a while
+if [ -d /Applications/Amphetamine.app ]; then
+  AMPH="CONFIG_DIR=$CONFIG_DIR NAME=amphetamine $PLUGIN_DIR/amphetamine.sh"
+  sketchybar --add item amphetamine right \
+             --set amphetamine label.drawing=off icon.padding_right=10 \
+                               update_freq=30 script="$PLUGIN_DIR/amphetamine.sh" \
+                               click_script="$AMPH menu" \
+                               popup.align=right \
+                               popup.background.color=$SURFACE0 \
+                               popup.background.corner_radius=12 \
+                               popup.background.border_width=2 \
+                               popup.background.border_color=$PEACH \
+                               popup.height=30 \
+             --subscribe amphetamine system_woke $HOVER_EVENTS
+
+  # The menu: a header, the lid switch, how long to stay awake, and Turn off.
+  # Every row is the same width so the hover highlights line up.
+  AMPH_W=290
+  amph_text() { # name label font color — a line of text, not clickable
+    sketchybar --add item "amphetamine.$1" popup.amphetamine \
+               --set "amphetamine.$1" icon.drawing=off label="$2" label.font="$3" label.color="$4" \
+                     label.padding_left=14 width=$AMPH_W background.drawing=off
+  }
+  amph_rule() { # name — a thin line between sections
+    sketchybar --add item "amphetamine.$1" popup.amphetamine \
+               --set "amphetamine.$1" icon.drawing=off label.drawing=off width=$AMPH_W \
+                     background.drawing=on background.color=$SURFACE1 background.height=1 \
+                     background.corner_radius=0 padding_left=10 padding_right=10
+  }
+  amph_row() { # name icon color label args — a clickable row that lights up on hover
+    sketchybar --add item "amphetamine.$1" popup.amphetamine \
+               --set "amphetamine.$1" icon="$2" icon.color="$3" icon.width=30 icon.padding_left=12 \
+                     label="$4" label.color=$SUBTEXT width=$AMPH_W \
+                     background.drawing=on background.color=$SURFACE0 background.height=30 \
+                     background.corner_radius=8 padding_left=6 padding_right=6 \
+                     script="$PLUGIN_DIR/row.sh" click_script="$AMPH $5" \
+               --subscribe "amphetamine.$1" $HOVER_EVENTS
+  }
+
+  sketchybar --add item amphetamine.title popup.amphetamine \
+             --set amphetamine.title icon="$G_AWAKE_OFF" icon.font="$FONT:Bold:20.0" icon.padding_left=14 \
+                                     label="Amphetamine" label.font="$FONT:Bold:15.0" label.color=$TEXT \
+                                     width=$AMPH_W background.drawing=off
+  amph_text status "Off" "$FONT:Regular:12.0" $OVERLAY
+  amph_rule rule1
+  amph_row  lid     "$G_TOGGLE_OFF" $OVERLAY "Stay awake with lid closed" "lid"
+  sketchybar --set amphetamine.lid icon.font="$FONT:Bold:22.0"
+  sketchybar --add item amphetamine.warning popup.amphetamine \
+             --set amphetamine.warning icon="$G_BATT_ALERT" icon.color=$YELLOW icon.width=30 icon.padding_left=18 \
+                                       label.font="$FONT:Regular:12.0" label.color=$YELLOW \
+                                       width=$AMPH_W background.drawing=off drawing=off
+  amph_rule rule2
+  amph_text section "KEEP AWAKE FOR" "$FONT:Bold:11.0" $OVERLAY
+  amph_row  forever "$G_INFINITY" $PEACH  "Until I turn it off" "start forever"
+  amph_row  30m     "$G_TIMER"    $YELLOW "30 minutes"          "start 30m 30 minutes"
+  amph_row  1h      "$G_TIMER"    $YELLOW "1 hour"              "start 1h 1 hours"
+  amph_row  2h      "$G_TIMER"    $YELLOW "2 hours"             "start 2h 2 hours"
+  amph_row  4h      "$G_TIMER"    $YELLOW "4 hours"             "start 4h 4 hours"
+  amph_row  off     "$G_AWAKE_OFF" $RED   "Turn off"            "off"
+fi
+
+# Invisible item that keeps the strip matching the wallpaper
+sketchybar --add item wallpaper left \
+           --set wallpaper drawing=off update_freq=300 script="$PLUGIN_DIR/wallpaper.sh" \
+           --subscribe wallpaper system_woke space_change display_change
+
 sketchybar --update
+
+# Menu helper (barclick/main.swift): started once, keeps running across reloads
+# (-x matches the running helper only, not quick calls like "barclick volume")
+if [ -x "$BARCLICK" ] && ! pgrep -fx "$BARCLICK" >/dev/null; then
+  CONFIG_DIR="$CONFIG_DIR" nohup "$BARCLICK" >/dev/null 2>&1 &
+fi
