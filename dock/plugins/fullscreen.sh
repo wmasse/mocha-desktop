@@ -10,9 +10,12 @@ source "$CONFIG_DIR/sizes.sh"
 STATE="$(osascript -l JavaScript "$CONFIG_DIR/plugins/fullscreen.js" 2>/dev/null)"
 CURRENT_Y="$(mochadock --query bar | grep -o '"y_offset":[[:space:]]*-\{0,1\}[0-9]*' | grep -o -- '-\{0,1\}[0-9]*$')"
 
+# (the dock helper slides an effect theme's stage along with it)
 if [ "$STATE" = "fullscreen" ]; then
-  [ "$CURRENT_Y" != "$DOCK_HIDDEN_Y" ] && mochadock --animate sin 12 --bar y_offset=$DOCK_HIDDEN_Y
+  [ "$CURRENT_Y" != "$DOCK_HIDDEN_Y" ] && "$CONFIG_DIR/bin/dockdrop" slide "$DOCK_HIDDEN_Y" 0.2 &&
+    mochadock --animate sin 12 --bar y_offset=$DOCK_HIDDEN_Y
 else
-  [ "$CURRENT_Y" != "$DOCK_Y" ] && mochadock --animate sin 20 --bar y_offset=$DOCK_Y
+  [ "$CURRENT_Y" != "$DOCK_Y" ] && "$CONFIG_DIR/bin/dockdrop" slide "$DOCK_Y" 0.33 &&
+    mochadock --animate sin 20 --bar y_offset=$DOCK_Y
 fi
 exit 0

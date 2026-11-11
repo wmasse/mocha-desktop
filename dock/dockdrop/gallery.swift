@@ -24,7 +24,7 @@ struct ThemeCard {
             source "$1"; THEME_DIR="$2"; source "$2/style.sh"
             printf '%s\\n' "$THEME_NAME" "$LABEL_FONT" "$MENU_COLOR" "$MENU_BORDER_COLOR" "$TEXT" "$BASE" "$APPLE_COLOR" \
               "$TRAY_COLOR" "$TRAY_BORDER_COLOR" "$TRAY_RADIUS" "$THEME_TILE_RADIUS" "$TILE_IDLE_COLOR" \
-              "$TILE_IDLE_COLORS" "$RUNNING_STYLE" "$RUNNING_COLOR" "$ICON_STYLE" "$BLUE" "$GREEN" "$PEACH" "$MAUVE"
+              "$TILE_IDLE_COLORS" "$RUNNING_STYLE" "$RUNNING_COLOR" "$ICON_STYLE" "$BLUE" "$GREEN" "$PEACH" "$MAUVE" "$STAGE_EFFECT"
             """
         let out = String(data: run("/usr/bin/env", ["-i", "HOME=" + NSHomeDirectory(), "/bin/bash", "-c", script, "_",
                                                      configDir + "/themes/\(key).sh", configDir]), encoding: .utf8) ?? ""
@@ -39,6 +39,12 @@ struct ThemeCard {
         card.idle = collage.isEmpty ? [themeColor(f[11])] : collage
         card.running = f[13]; card.runningColor = f[14].isEmpty ? nil : themeColor(f[14]); card.mono = f[15] == "mono"
         card.appColors = [themeColor(f[16]), themeColor(f[17]), themeColor(f[18]), themeColor(f[19])]
+        // An effect theme's card shows its effect, settled
+        let tiles = (0..<4).map { CGRect(x: 10 + 30 * CGFloat($0), y: 10, width: 24, height: 24) }
+        if f.count > 20, !f[20].isEmpty, let still = Stage.preview(f[20], size: CGSize(width: 134, height: 44), tiles: tiles) {
+            card.scenery = still
+            return card
+        }
         // The scenery strip, if the theme has one (cached like the dock's)
         let preview = configDir + "/cache/card-\(key).png"
         if !FileManager.default.fileExists(atPath: preview) {
@@ -180,14 +186,16 @@ final class ThemeGallery {
                       "nebula", "orbit"]
         let orbit = ["sticker", "sherbet", "daybreak", "gasgiant", "ring", "rocket", "cumulus", "starlight", "redplanet", "moonlight"]
         let styles = ["broadsheet", "saddle", "swiss", "phosphor", "pop", "precision", "obsidian", "millennium", "bento", "riso"]
+        let effects = ["current", "claymation", "ferrofluid", "popup", "livewire", "hourglass", "overgrowth", "lava", "campfire", "jelly"]
         let all = ((try? FileManager.default.contentsOfDirectory(atPath: configDir + "/themes")) ?? [])
             .filter { $0.hasSuffix(".sh") }.map { String($0.dropLast(3)) }
-        let known = classic + scenes + orbit + styles
+        let known = classic + scenes + orbit + styles + effects
         let sections: [(String, [String])] = [
             ("Classic", classic.filter(all.contains) + all.filter { !known.contains($0) }.sorted()),
             ("Scenes", scenes.filter(all.contains)),
             ("Candy Orbit", orbit.filter(all.contains)),
             ("Styles", styles.filter(all.contains)),
+            ("Effects", effects.filter(all.contains)),
         ].filter { !$0.1.isEmpty }
         // One section per page; opening the gallery shows the page with the theme you're on
         if page == nil || opening { page = sections.firstIndex { $0.1.contains(current) } ?? 0 }

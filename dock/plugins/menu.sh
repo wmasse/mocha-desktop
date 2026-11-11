@@ -133,13 +133,14 @@ case "$ACTION" in
     SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit"
     CANDY_ORBIT="sticker sherbet daybreak gasgiant ring rocket cumulus starlight redplanet moonlight"
     STYLES="broadsheet saddle swiss phosphor pop precision obsidian millennium bento riso"
+    EFFECTS="current claymation ferrofluid popup livewire hourglass overgrowth lava campfire jelly"
     # any other theme files (your own) go with the classics
     for file in "$CONFIG_DIR"/themes/*.sh; do
       key="$(basename "$file" .sh)"
-      [[ " $CLASSIC $SCENES $CANDY_ORBIT $STYLES " == *" $key "* ]] || CLASSIC+=" $key"
+      [[ " $CLASSIC $SCENES $CANDY_ORBIT $STYLES $EFFECTS " == *" $key "* ]] || CLASSIC+=" $key"
     done
     mkdir -p "$CONFIG_DIR/cache"
-    for section in CLASSIC SCENES CANDY_ORBIT STYLES; do
+    for section in CLASSIC SCENES CANDY_ORBIT STYLES EFFECTS; do
       MENU+=(--add item "menu.section_$section" popup."$ITEM"
              --set "menu.section_$section" icon.drawing=off label="${section//_/ }" label.drawing=on
                    label.color=$OVERLAY label.font.size=11 label.padding_left=12 background.drawing=off

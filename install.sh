@@ -145,6 +145,7 @@ if wants dock; then
   elif $CAN_BUILD; then
     "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" \
       "$REPO/dock/dockdrop/apps.swift" "$REPO/dock/dockdrop/gallery.swift" \
+      "$REPO/dock/dockdrop/stage.swift" "$REPO/dock/dockdrop/effects.swift" \
       || echo "    couldn't build the dock helper; the dock works, but without hover, drag and drop or its panels"
   else
     echo "    skipped the dock helper (needs Xcode Command Line Tools: xcode-select --install)"

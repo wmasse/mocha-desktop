@@ -65,6 +65,17 @@ func run(_ path: String, _ args: [String], extraEnv: [String: String] = [:]) -> 
 }
 
 /// Where each tile currently sits on screen, read from SketchyBar.
+/// Whether SketchyBar is drawing the dock on this space. On a full-screen space it parks the dock's windows
+/// far off screen (-9999), and that happens even when the space doesn't look full screen to plugins/fullscreen.js
+func dockOnScreen() -> Bool {
+    guard let list = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else { return true }
+    let owner = barCommand.split(separator: "/").last.map(String.init)
+    return list.contains { w in
+        guard (w["kCGWindowOwnerName"] as? String) == owner, let b = w["kCGWindowBounds"] as? [String: CGFloat] else { return false }
+        return (b["X"] ?? -9999) > -1000 && (b["Height"] ?? 0) >= 40
+    }
+}
+
 func loadTiles() -> [Tile] {
     guard let text = try? String(contentsOfFile: configDir + "/apps.txt", encoding: .utf8) else { return [] }
     var entries: [(String, URL?)] = text.split(separator: "\n").compactMap { line in
@@ -187,6 +198,11 @@ final class Hover {
     private let lock = NSLock()
     private var pending = false
 
+    /// For the stage (effect themes): where the tiles are, and which tile is under the pointer
+    var onGeometry: ((_ spots: [(item: String, midX: CGFloat)], _ yOffset: CGFloat, _ height: CGFloat, _ shown: Bool,
+                      _ tile: CGFloat, _ gap: CGFloat) -> Void)?
+    var onHover: ((String?) -> Void)?
+
     func start() {
         refreshGeometry()
         // Positions only change on a reload, an app move, or the full-screen slide
@@ -219,12 +235,13 @@ final class Hover {
             let lookDate = ["theme.txt", "custom-\(currentTheme()).sh"].map { name in
                 (try? FileManager.default.attributesOfItem(atPath: configDir + "/" + name)[.modificationDate] as? Date)?
                     .timeIntervalSince1970 ?? 0 }
-            let sig = "\(items)|\(bar["margin"] ?? "")|\(appsDate)|\(lookDate)"
+            // away (a full-screen space, or parked below the screen), SketchyBar reports no positions: read them again when it's back
+            let sig = "\(items)|\(bar["margin"] ?? "")|\(appsDate)|\(lookDate)|\(yOffset >= 0)|\(dockOnScreen())"
 
             var newSpots: [Spot]?
             var newSizes: Sizes?
             if sig != signature || settle {
-                settle = sig != signature   // layout may not be final yet; read again next time
+                settle = sig != signature
                 signature = sig
                 newSpots = loadTiles().map { Spot(item: $0.item, midX: ($0.minX + $0.maxX) / 2) }
                 newSizes = readSizes()
@@ -244,6 +261,7 @@ final class Hover {
                     lock.unlock()
                     request(wanted)
                 }
+                onGeometry?(spots.map { ($0.item, $0.midX) }, CGFloat(yOffset), CGFloat(height), shown, CGFloat(sizes.tile), CGFloat(sizes.gap))
             }
         }
     }
@@ -266,6 +284,7 @@ final class Hover {
         guard item != wanted else { return }
         wanted = item
         request(item)
+        onHover?(item)
     }
 
     /// Updates go out one at a time; while one is running, only the newest wish is kept
@@ -333,6 +352,7 @@ final class Helper: NSObject, NSApplicationDelegate {
     private let hover = Hover()
     private let appsPanel = AppsPanel()
     private let gallery = ThemeGallery()
+    private let stage = Stage()
 
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -368,6 +388,10 @@ final class Helper: NSObject, NSApplicationDelegate {
             self.appsPanel.toggle(midX: spot.midX, trayTop: spot.trayTop)
         }
 
+        // Effect themes animate on a stage behind the tiles (stage.swift)
+        hover.onGeometry = { [weak self] in self?.stage.update(spots: $0, yOffset: $1, height: $2, shown: $3, tile: $4, gap: $5) }
+        hover.onHover = { [weak self] in self?.stage.hoverChanged($0) }
+        stage.start()
         hover.start()
 
         // Watch for file drags 20 times a second; this is cheap and needs no permissions
@@ -449,6 +473,13 @@ final class Helper: NSObject, NSApplicationDelegate {
             self.window.orderOut(nil)
         }
     }
+}
+
+// dockdrop slide <y_offset> <seconds>: fullscreen.sh is sliding the dock; the stage follows it
+if CommandLine.arguments.count == 4, CommandLine.arguments[1] == "slide" {
+    DistributedNotificationCenter.default().postNotificationName(slideNote, object: "\(CommandLine.arguments[2]),\(CommandLine.arguments[3])",
+                                                                 userInfo: nil, deliverImmediately: true)
+    exit(0)
 }
 
 // dockdrop apps | themes: open or close the open-apps panel or the theme gallery in the running helper

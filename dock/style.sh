@@ -44,3 +44,7 @@ export LABEL_REGULAR="${LABEL_REGULAR:-Regular}"
 # scenery behind the tray, drawn by bin/dockart for themes it knows
 export TILE_IDLE_COLORS="${TILE_IDLE_COLORS:-}"
 export RUNNING_COLOR="${RUNNING_COLOR:-}"   # with RUNNING_STYLE=fill: one color for every open app (empty: each app's own)
+
+# Effect themes: an animation the dock helper draws behind the tiles (dockdrop/effects.swift),
+# reacting to the app you're on. Empty for every other theme.
+export STAGE_EFFECT="${STAGE_EFFECT:-}"
