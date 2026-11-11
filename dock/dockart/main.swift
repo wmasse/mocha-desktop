@@ -25,6 +25,29 @@ let gaps: [Double] = {
     return Array(stride(from: 60.0, to: W - 30, by: 60))
 }()
 let band = max(0, (H - tile) / 2) / H   // the visible band above (and below) the tiles, as a fraction
+/// Each tile's left and right edge in points (DOCKART_TILES "l-r,l-r,…", the Trash included);
+/// without it, worked out from the gaps
+let tiles: [(Double, Double)] = {
+    let given = (env["DOCKART_TILES"] ?? "").split(separator: ",").compactMap { pair -> (Double, Double)? in
+        let p = pair.split(separator: "-").compactMap { Double($0) }
+        return p.count == 2 ? (p[0], p[1]) : nil
+    }
+    if !given.isEmpty { return given }
+    guard let first = gaps.first else { return [] }
+    let pitch = gaps.count > 1 ? gaps[1] - gaps[0] : 60
+    return ([first - pitch / 2] + gaps.map { $0 + pitch / 2 }).map { ($0 - tile / 2, $0 + tile / 2) }
+}()
+/// A rectangle from x0 to x1 points across and fractions y0 to y1 down
+func rect(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double) -> CGRect {
+    CGRect(x: x0 * S, y: (1 - y1) * H * S, width: (x1 - x0) * S, height: (y1 - y0) * H * S)
+}
+func fillRect(_ ctx: CGContext, _ r: CGRect, _ hex: String, _ alpha: Double) { ctx.setFillColor(color(hex, alpha)); ctx.fill(r) }
+func dashes(_ ctx: CGContext, y: Double, from x0: Double, to x1: Double, dash: Double, gap: Double, width w: Double, _ hex: String, _ alpha: Double) {
+    ctx.saveGState()
+    ctx.beginPath(); ctx.move(to: pt(x0, y)); ctx.addLine(to: pt(x1, y))
+    ctx.setStrokeColor(color(hex, alpha)); ctx.setLineWidth(w * S); ctx.setLineDash(phase: 0, lengths: [dash * S, gap * S])
+    ctx.strokePath(); ctx.restoreGState()
+}
 
 func color(_ hex: String, _ alpha: Double = 1) -> CGColor {
     let v = UInt32(hex, radix: 16)!
@@ -394,6 +417,112 @@ let scenes: [String: (CGContext) -> Void] = [
         ctx.setBlendMode(.normal)
         ctx.setStrokeColor(color("3255a4", 0.9)); ctx.setLineWidth(2 * S)   // the blue frame, printed 2pt off
         ctx.stroke(CGRect(x: 3.5 * S, y: 1.5 * S, width: (W - 5) * S, height: (H - 4.5) * S))
+    },
+    // ---- Styles ----
+
+    // Broadsheet (brutalist editorial): newsprint under a solid black masthead rule with a
+    // red issue block, column rules standing in the gaps, a double rule at the foot
+    "broadsheet": { ctx in
+        fillRect(ctx, rect(0, 0, W, 1), "f1efe9", 1)
+        var r = Seeded(state: 8)
+        for _ in 0..<Int(W * 1.5) { dot(ctx, x: r.next() * W, y: r.next(), r: 0.3, "000000", 0.06) }
+        fillRect(ctx, rect(0, 0, W, band * 0.62), "111111", 1)
+        fillRect(ctx, rect(W - 74, 0, W - 22, band * 0.62), "ff2a00", 1)
+        for x in gaps { gapLine(ctx, x: x, band + 0.04, 1 - band - 0.04, width: 0.9, "111111", 0.9) }
+        fillRect(ctx, rect(0, 1 - band * 0.55, W, 1 - band * 0.55 + 1.6 / H), "111111", 1)
+        fillRect(ctx, rect(0, 1 - band * 0.2, W, 1 - band * 0.2 + 0.6 / H), "111111", 1)
+    },
+    // Saddle (warm tactile analog): cognac leather with its grain, saddle-stitched along
+    // both edges in cream thread. Nothing in the gaps; the leather is the point
+    "saddle": { ctx in
+        vertical(ctx, [(0, "a0602f"), (0.5, "8f5228"), (1, "74401f")])
+        horizontal(ctx, [(0, "000000"), (0.12, "000000"), (0.5, "ffffff"), (0.88, "000000"), (1, "000000")], alpha: 0.07)
+        var r = Seeded(state: 4)
+        for _ in 0..<Int(W * 3) { dot(ctx, x: r.next() * W, y: r.next(), r: 0.35, r.next() < 0.5 ? "3a1f0c" : "e8c49a", 0.09) }
+        for y in [band * 0.48, 1 - band * 0.48] {
+            dashes(ctx, y: y + 0.6 / H, from: 10, to: W - 10, dash: 3.6, gap: 2.4, width: 1.2, "3a1f0c", 0.45)   // the stitch holes' shadow
+            dashes(ctx, y: y, from: 10, to: W - 10, dash: 3.6, gap: 2.4, width: 1.1, "f3e3c4", 0.9)
+        }
+    },
+    // Swiss: white, one red field taking the first columns, a heavy black bar at the
+    // foot, a hairline and grid ticks along the top, everything else left empty
+    "swiss": { ctx in
+        fillRect(ctx, rect(0, 0, W, 1), "ffffff", 1)
+        let edge = gaps.count > 1 ? gaps[1] : W * 0.15
+        fillRect(ctx, rect(0, 0, edge, 1), "ff1a1a", 1)
+        fillRect(ctx, rect(0, 1 - band * 0.62, W, 1), "111111", 1)
+        fillRect(ctx, rect(edge, band * 0.45, W, band * 0.45 + 0.7 / H), "111111", 1)
+        for (l, _) in tiles where l > edge { fillRect(ctx, rect(l, band * 0.45 - 2.4 / H, l + 0.8, band * 0.45), "111111", 1) }
+    },
+    // Pop (neo-brutalist): sunflower yellow, and a hard black shadow knocked out behind
+    // every tile, offset down and right like a sticker on a page
+    "pop": { ctx in
+        fillRect(ctx, rect(0, 0, W, 1), "ffc900", 1)
+        let top = band, bottom = 1 - band, d = 3.5 * tile / 52, round = 8 * tile / 52
+        for (l, rr) in tiles {
+            let box = rect(l + d, top + d / H, rr + d, bottom + d / H)
+            ctx.addPath(CGPath(roundedRect: box, cornerWidth: round * S, cornerHeight: round * S, transform: nil))
+            ctx.setFillColor(color("111111", 1)); ctx.fillPath()
+        }
+    },
+    // Precision (industrial, after the ten principles): warm grey enamel, a speaker grille
+    // of fine perforations in the top-right corner only, one orange power light
+    "precision": { ctx in
+        vertical(ctx, [(0, "eceae5"), (1, "dddad3")])
+        for row in 0..<2 {
+            for x in stride(from: W * 0.62, to: W - 16, by: 4) {
+                dot(ctx, x: x + Double(row) * 2, y: band * (0.3 + Double(row) * 0.38), r: 0.65, "4a4844", 0.55)
+            }
+        }
+        glow(ctx, x: 18, y: band * 0.5, radius: 6, "ff6a13", 0.5)
+        dot(ctx, x: 18, y: band * 0.5, r: 1.6, "ff6a13", 1)
+    },
+    // Obsidian (high-craft dark): near-black with a fine grain, one warm light from above,
+    // and a hairline of light along the top edge, like a machined bevel
+    "obsidian": { ctx in
+        fillRect(ctx, rect(0, 0, W, 1), "0c0d0f", 1)
+        var r = Seeded(state: 2)
+        for _ in 0..<Int(W * 2) { dot(ctx, x: r.next() * W, y: r.next(), r: 0.3, "ffffff", 0.035) }
+        glow(ctx, x: W * 0.5, y: -0.6, radius: W * 0.32, "ff6363", 0.16)
+        glow(ctx, x: W * 0.5, y: -0.6, radius: W * 0.12, "ffd2c2", 0.10)
+        let edge = rect(24, 0.012, W - 24, 0.012 + 0.6 / H)
+        let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                           colors: [color("ffffff", 0), color("ffffff", 0.22), color("ffffff", 0)] as CFArray, locations: [0, 0.5, 1])!
+        ctx.saveGState(); ctx.clip(to: edge)
+        ctx.drawLinearGradient(g, start: CGPoint(x: edge.minX, y: 0), end: CGPoint(x: edge.maxX, y: 0), options: [])
+        ctx.restoreGState()
+    },
+    // Millennium (Y2K): brushed chrome, acid-lime sparkles in some gaps, and a
+    // segmented loading bar along the bottom, stuck at 62%
+    "millennium": { ctx in
+        vertical(ctx, [(0, "d9dde0"), (0.16, "ffffff"), (0.46, "c8cdd2"), (0.56, "aab0b6"), (0.82, "eceef0"), (1, "c2c7cc")])
+        for (i, x) in gaps.enumerated() where i % 3 == 1 { sparkle(ctx, x: x, y: 0.5, r: 3.4, "b8f000", 1) }
+        let y0 = 1 - band * 0.78, y1 = 1 - band * 0.22
+        var x = 16.0
+        while x + 4 < W - 16 {
+            let done = x < (W - 32) * 0.62 + 16
+            let box = rect(x, y0, x + 4, y1)
+            if done { fillRect(ctx, box, "b8f000", 1); ctx.setStrokeColor(color("5a7000", 0.7)) }
+            else { fillRect(ctx, box, "ffffff", 0.5); ctx.setStrokeColor(color("6a7178", 0.5)) }
+            ctx.setLineWidth(0.5 * S); ctx.stroke(box)
+            x += 5.5
+        }
+    },
+    // Bento (Japanese bento and magazine editorial): washi paper divided like a bento
+    // box: ink rules above and below, a divider in every gap, a vermilion seal in the corner
+    "bento": { ctx in
+        fillRect(ctx, rect(0, 0, W, 1), "f4efe4", 1)
+        var r = Seeded(state: 11)
+        for _ in 0..<Int(W * 0.8) {   // paper fibres
+            let x = r.next() * W, y = r.next(), a = r.next() * 3.1
+            ctx.beginPath(); ctx.move(to: pt(x, y)); ctx.addLine(to: pt(x + cos(a) * 3, y + sin(a) * 3 / H))
+            ctx.setStrokeColor(color("b8a888", 0.18)); ctx.setLineWidth(0.4 * S); ctx.strokePath()
+        }
+        let t = band * 0.5, b = 1 - band * 0.5
+        for y in [t, b] { fillRect(ctx, rect(8, y - 0.6 / H, W - 8, y + 0.6 / H), "1c1c1c", 0.9) }
+        for x in gaps { gapLine(ctx, x: x, t, b, width: 1.2, "1c1c1c", 0.9) }
+        fillRect(ctx, rect(W - 26, t - 3.2 / H, W - 18.5, t + 4.3 / H), "e34234", 1)   // the seal, over the rule
+        ctx.setStrokeColor(color("f4efe4", 0.8)); ctx.setLineWidth(0.5 * S); ctx.stroke(rect(W - 24.8, t - 2.0 / H, W - 19.7, t + 3.1 / H))
     },
     // Moonlight: the half-lit moon, pale grey into its shadow along the dock, with a
     // crater in each gap, lighter or darker with the side it is on

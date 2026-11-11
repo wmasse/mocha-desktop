@@ -130,15 +130,16 @@ case "$ACTION" in
     MENU=(--remove '/menu\..*/')
     menu_entry back "$G_BACK" $OVERLAY "Back" show
     CLASSIC="mocha latte graphite paper nord terminal"
-    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit phosphor riso"
+    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit"
     CANDY_ORBIT="sticker sherbet daybreak gasgiant ring rocket cumulus starlight redplanet moonlight"
+    STYLES="broadsheet saddle swiss phosphor pop precision obsidian millennium bento riso"
     # any other theme files (your own) go with the classics
     for file in "$CONFIG_DIR"/themes/*.sh; do
       key="$(basename "$file" .sh)"
-      [[ " $CLASSIC $SCENES $CANDY_ORBIT " == *" $key "* ]] || CLASSIC+=" $key"
+      [[ " $CLASSIC $SCENES $CANDY_ORBIT $STYLES " == *" $key "* ]] || CLASSIC+=" $key"
     done
     mkdir -p "$CONFIG_DIR/cache"
-    for section in CLASSIC SCENES CANDY_ORBIT; do
+    for section in CLASSIC SCENES CANDY_ORBIT STYLES; do
       MENU+=(--add item "menu.section_$section" popup."$ITEM"
              --set "menu.section_$section" icon.drawing=off label="${section//_/ }" label.drawing=on
                    label.color=$OVERLAY label.font.size=11 label.padding_left=12 background.drawing=off

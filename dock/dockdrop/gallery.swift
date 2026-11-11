@@ -44,7 +44,8 @@ struct ThemeCard {
         if !FileManager.default.fileExists(atPath: preview) {
             // the card's own layout: four 24pt tiles, 6pt apart, centered in a 134pt tray
             run(configDir + "/bin/dockart", [key, "134", preview, "44"],
-                extraEnv: ["DOCKART_GAPS": "37,67,97", "DOCKART_TILE": "24"])
+                extraEnv: ["DOCKART_GAPS": "37,67,97", "DOCKART_TILE": "24",
+                           "DOCKART_TILES": "10-34,40-64,70-94,100-124"])
         }
         card.scenery = NSImage(contentsOfFile: preview)
         return card
@@ -113,11 +114,43 @@ final class CardView: HoverView {
     override func mouseUp(with event: NSEvent) { onPick() }
 }
 
+/// A tab at the top of the gallery: the section's name, underlined when it's the open page,
+/// with a small dot when the theme you're on is in it
+final class TabButton: HoverView {
+    let title: String, selected: Bool, holdsCurrent: Bool, look: PanelLook, action: () -> Void
+    private var attrs: [NSAttributedString.Key: Any] {
+        [.font: panelFont(12.5, bold: true), .foregroundColor: selected ? look.text : (hovering ? look.subtext : look.muted)]
+    }
+    init(title: String, selected: Bool, holdsCurrent: Bool, look: PanelLook, origin: NSPoint, action: @escaping () -> Void) {
+        self.title = title; self.selected = selected; self.holdsCurrent = holdsCurrent; self.look = look; self.action = action
+        super.init(frame: .zero)
+        let w = (title as NSString).size(withAttributes: [.font: panelFont(12.5, bold: true)]).width
+        frame = NSRect(x: origin.x, y: origin.y, width: w + (holdsCurrent ? 30 : 20), height: 30)
+        highlight = .clear
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func draw(_ dirtyRect: NSRect) {
+        let size = (title as NSString).size(withAttributes: attrs)
+        (title as NSString).draw(at: NSPoint(x: 10, y: (bounds.height - size.height) / 2 - 2), withAttributes: attrs)
+        if holdsCurrent {
+            look.subtext.withAlphaComponent(selected ? 0.9 : 0.5).setFill()
+            NSBezierPath(ovalIn: NSRect(x: 10 + size.width + 5, y: bounds.midY - 4.5, width: 5, height: 5)).fill()
+        }
+        if selected {
+            look.text.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 10, y: bounds.height - 3, width: size.width, height: 2.5), xRadius: 1.25, yRadius: 1.25).fill()
+        }
+    }
+    override func mouseUp(with event: NSEvent) { action() }
+}
+
 final class ThemeGallery {
     private var panel: NSPanel?
     private var anchorMidX: CGFloat = 0, trayTop: CGFloat = 0
     private var lastClosed = Date.distantPast
     private var cards: [String: ThemeCard] = [:]   // drawn once per session; themes rarely change
+    private var page: Int?                         // which section's page is showing
+    private var opening = false
 
     var isOpen: Bool { panel?.isVisible ?? false }
 
@@ -125,6 +158,7 @@ final class ThemeGallery {
         if isOpen { close(); return }
         if Date().timeIntervalSince(lastClosed) < 0.35 { return }
         anchorMidX = midX; self.trayTop = trayTop
+        opening = true
         build()
     }
 
@@ -143,30 +177,30 @@ final class ThemeGallery {
         let current = currentTheme()
         let classic = ["mocha", "latte", "graphite", "paper", "nord", "terminal"]
         let scenes = ["harvest", "dusklake", "alpenglow", "nightgarden", "sakura", "aurora", "dune", "tide", "velvet", "matcha",
-                      "nebula", "orbit", "phosphor", "riso"]
+                      "nebula", "orbit"]
         let orbit = ["sticker", "sherbet", "daybreak", "gasgiant", "ring", "rocket", "cumulus", "starlight", "redplanet", "moonlight"]
+        let styles = ["broadsheet", "saddle", "swiss", "phosphor", "pop", "precision", "obsidian", "millennium", "bento", "riso"]
         let all = ((try? FileManager.default.contentsOfDirectory(atPath: configDir + "/themes")) ?? [])
             .filter { $0.hasSuffix(".sh") }.map { String($0.dropLast(3)) }
-        let known = classic + scenes + orbit
+        let known = classic + scenes + orbit + styles
         let sections: [(String, [String])] = [
-            ("CLASSIC", classic.filter(all.contains) + all.filter { !known.contains($0) }.sorted()),
-            ("SCENES", scenes.filter(all.contains)),
-            ("CANDY ORBIT", orbit.filter(all.contains)),
-        ]
-        for key in all where cards[key] == nil { cards[key] = ThemeCard.load(key: key) }
+            ("Classic", classic.filter(all.contains) + all.filter { !known.contains($0) }.sorted()),
+            ("Scenes", scenes.filter(all.contains)),
+            ("Candy Orbit", orbit.filter(all.contains)),
+            ("Styles", styles.filter(all.contains)),
+        ].filter { !$0.1.isEmpty }
+        // One section per page; opening the gallery shows the page with the theme you're on
+        if page == nil || opening { page = sections.firstIndex { $0.1.contains(current) } ?? 0 }
+        opening = false
+        let shown = min(page ?? 0, sections.count - 1)
+        for key in sections[shown].1 where cards[key] == nil { cards[key] = ThemeCard.load(key: key) }
 
-        let cardW: CGFloat = 158, cardH: CGFloat = 92, gap: CGFloat = 12, pad: CGFloat = 22
-        let header: CGFloat = 58, label: CGFloat = 28, footer: CGFloat = 54
-        let screenSize = NSScreen.screens.first?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
-        func size(_ cols: Int) -> NSSize {
-            var h = header + footer
-            for (_, keys) in sections where !keys.isEmpty { h += label + CGFloat((keys.count + cols - 1) / cols) * (cardH + gap) }
-            return NSSize(width: pad * 2 + CGFloat(cols) * cardW + CGFloat(cols - 1) * gap, height: h)
-        }
-        // four columns, or more when that would run taller than the screen
-        var cols = 4
-        while size(cols).height > screenSize.height - 140, size(cols + 1).width < screenSize.width - 40 { cols += 1 }
-        let width = size(cols).width, height = size(cols).height
+        let cols = 4, cardW: CGFloat = 158, cardH: CGFloat = 92, gap: CGFloat = 12, pad: CGFloat = 22
+        let header: CGFloat = 58, tabs: CGFloat = 44, footer: CGFloat = 54
+        // sized for the longest page, so switching pages doesn't make the panel jump
+        let rows = sections.map { ($0.1.count + cols - 1) / cols }.max() ?? 1
+        let width = pad * 2 + CGFloat(cols) * cardW + CGFloat(cols - 1) * gap
+        let height = header + tabs + CGFloat(rows) * (cardH + gap) + footer
 
         let content = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         content.wantsLayer = true
@@ -182,21 +216,28 @@ final class ThemeGallery {
         sub.font = panelFont(11); sub.textColor = look.muted
         sub.frame = NSRect(x: pad, y: 35, width: width - pad * 2, height: 15); content.addSubview(sub)
 
-        var y = header
-        for (name, keys) in sections where !keys.isEmpty {
-            let l = NSTextField(labelWithString: name)
-            l.font = panelFont(10.5, bold: true); l.textColor = look.muted
-            l.frame = NSRect(x: pad + 2, y: y + 6, width: 200, height: 14); content.addSubview(l)
-            y += label
-            for (i, key) in keys.enumerated() {
-                guard let card = cards[key] else { continue }
-                let x = pad + CGFloat(i % cols) * (cardW + gap), cy = y + CGFloat(i / cols) * (cardH + gap)
-                let v = CardView(card: card, current: key == current, look: look,
-                                 frame: NSRect(x: x, y: cy, width: cardW, height: cardH))
-                v.onPick = { [weak self] in self?.pick(key) }
-                content.addSubview(v)
+        // The tabs: one per section, the open one underlined; a dot marks the section you're on
+        var tx = pad - 8
+        for (i, (name, keys)) in sections.enumerated() {
+            let tab = TabButton(title: name, selected: i == shown, holdsCurrent: keys.contains(current), look: look,
+                                origin: NSPoint(x: tx, y: header + 4)) { [weak self] in
+                guard let self, self.page != i else { return }
+                self.page = i; self.build()
             }
-            y += CGFloat((keys.count + cols - 1) / cols) * (cardH + gap)
+            content.addSubview(tab)
+            tx += tab.frame.width + 4
+        }
+        let rule = NSView(frame: NSRect(x: pad, y: header + tabs - 6, width: width - pad * 2, height: 1))
+        rule.wantsLayer = true; rule.layer?.backgroundColor = look.border.cgColor; content.addSubview(rule)
+
+        let y = header + tabs + 6
+        for (i, key) in sections[shown].1.enumerated() {
+            guard let card = cards[key] else { continue }
+            let x = pad + CGFloat(i % cols) * (cardW + gap), cy = y + CGFloat(i / cols) * (cardH + gap)
+            let v = CardView(card: card, current: key == current, look: look,
+                             frame: NSRect(x: x, y: cy, width: cardW, height: cardH))
+            v.onPick = { [weak self] in self?.pick(key) }
+            content.addSubview(v)
         }
 
         let line = NSView(frame: NSRect(x: pad, y: height - footer, width: width - pad * 2, height: 1))
