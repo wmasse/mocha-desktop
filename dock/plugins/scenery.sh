@@ -1,25 +1,49 @@
 #!/bin/bash
 # The scenery behind the tray, for themes that have it (drawn by bin/dockart from
 # dockart/main.swift). Drawn at the tray's exact width, so its rounded ends line
-# up; cached, so it's only redrawn when the theme or the tray's width changes.
+# up, and told where the gaps between tiles are, so details sit in the gaps
+# instead of being cut up by the tiles. Cached; only redrawn when the theme or
+# the layout changes.
 CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar-dock}"
 source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/sizes.sh"
 CACHE="$CONFIG_DIR/cache"
 
-WIDTH="$(mochadock --query dock 2>/dev/null | python3 -c '
-import json, sys
+# The tray's width, and the center of each gap between app tiles (relative to the
+# tray's left edge). The gap holding the divider is left out, so nothing crowds it.
+read -r WIDTH GAPS <<< "$(python3 -c '
+import json, subprocess
+def query(name):
+    out = subprocess.run(["mochadock", "--query", name], capture_output=True, text=True).stdout
+    return json.loads(out)
+def rect(name):
+    return list(query(name)["bounding_rects"].values())[0]
 try:
-    rects = json.load(sys.stdin)["bounding_rects"]
-    print(int(round(list(rects.values())[0]["size"][0])))
+    tray = rect("dock")
+    apps = [i for i in query("bar")["items"] if i.startswith("app.")]
 except Exception:
-    pass')"
+    raise SystemExit
+left = tray["origin"][0]
+spans = []
+for name in apps:
+    try:
+        r = rect(name)
+        spans.append((r["origin"][0] - left, r["origin"][0] - left + r["size"][0]))
+    except Exception:
+        pass
+spans.sort()
+gaps = [round((a[1] + b[0]) / 2, 1) for a, b in zip(spans, spans[1:])]
+print(int(round(tray["size"][0])), ",".join(map(str, gaps)))' 2>/dev/null)"
 [ -z "$WIDTH" ] && exit 0
 
-ART="$CACHE/scenery-$THEME-$WIDTH.png"
+KEY="$(echo "$THEME $WIDTH $GAPS $TRAY_BORDER_COLOR" | shasum | cut -c1-10)"
+ART="$CACHE/scenery-$THEME-$KEY.png"
 mkdir -p "$CACHE"
 if [ ! -f "$ART" ]; then
   rm -f "$CACHE"/scenery-*.png
-  "$CONFIG_DIR/bin/dockart" "$THEME" "$WIDTH" "$ART" 2>/dev/null || rm -f "$ART"
+  # the outline goes on top, since the scenery covers the tray's own border
+  DOCKART_GAPS="$GAPS" DOCKART_TILE="$TILE" "$CONFIG_DIR/bin/dockart" "$THEME" "$WIDTH" "$ART" 68 \
+    "$TRAY_BORDER_COLOR" "$TRAY_BORDER_WIDTH" "$(( TRAY_RADIUS > 30 ? 30 : TRAY_RADIUS ))" 2>/dev/null || rm -f "$ART"
 fi
 
 if [ -f "$ART" ]; then

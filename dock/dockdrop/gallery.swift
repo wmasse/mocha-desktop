@@ -42,7 +42,9 @@ struct ThemeCard {
         // The scenery strip, if the theme has one (cached like the dock's)
         let preview = configDir + "/cache/card-\(key).png"
         if !FileManager.default.fileExists(atPath: preview) {
-            run(configDir + "/bin/dockart", [key, "134", preview, "44"])
+            // the card's own layout: four 24pt tiles, 6pt apart, centered in a 134pt tray
+            run(configDir + "/bin/dockart", [key, "134", preview, "44"],
+                extraEnv: ["DOCKART_GAPS": "37,67,97", "DOCKART_TILE": "24"])
         }
         card.scenery = NSImage(contentsOfFile: preview)
         return card
@@ -140,7 +142,7 @@ final class ThemeGallery {
         let look = PanelLook.current()
         let current = currentTheme()
         let classic = ["mocha", "latte", "graphite", "paper", "nord", "terminal"]
-        let scenes = ["harvest", "dusklake", "alpenglow", "nightgarden", "sakura", "aurora", "dune", "tide", "velvet", "matcha"]
+        let scenes = ["harvest", "dusklake", "alpenglow", "nightgarden", "sakura", "aurora", "dune", "tide", "velvet", "matcha", "nebula", "orbit"]
         let all = ((try? FileManager.default.contentsOfDirectory(atPath: configDir + "/themes")) ?? [])
             .filter { $0.hasSuffix(".sh") }.map { String($0.dropLast(3)) }
         let sections: [(String, [String])] = [

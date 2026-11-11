@@ -130,7 +130,7 @@ case "$ACTION" in
     MENU=(--remove '/menu\..*/')
     menu_entry back "$G_BACK" $OVERLAY "Back" show
     CLASSIC="mocha latte graphite paper nord terminal"
-    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha"
+    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit"
     # any other theme files (your own) go with the classics
     for file in "$CONFIG_DIR"/themes/*.sh; do
       key="$(basename "$file" .sh)"

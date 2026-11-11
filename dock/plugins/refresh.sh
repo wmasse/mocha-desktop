@@ -31,7 +31,7 @@ while IFS='|' read -r key path bundle glyph color; do
     case "$RUNNING_STYLE" in
       invert)  BG=$TEXT; FG=$BASE; BW=0 ;;
       outline) BW=2; BC=$APP_COLOR ;;
-      *)       BG="${RUNNING_COLOR:-${!color}}"; FG=$BASE; BW=0 ;;
+      *)       BG="${RUNNING_COLOR:-${!color}}"; FG=$BASE ;;   # keeps the theme's tile outline
     esac
   fi
   if [ "$bundle" = "$FRONT" ]; then BW=2; BC=$FRONT_RING_COLOR; fi
