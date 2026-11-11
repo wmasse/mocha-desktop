@@ -29,5 +29,6 @@ killall Rectangle 2>/dev/null
 echo
 echo "Done. SketchyBar, Rectangle and the font are still installed; remove them with:"
 echo "  brew uninstall sketchybar && brew uninstall --cask rectangle font-hack-nerd-font"
+echo "If you set up the Low Power button, remove its rule with: sudo rm /etc/sudoers.d/mocha-lowpower"
 echo "If Apple's menu bar stays hidden, set System Settings → Control Center →"
 echo "\"Automatically hide and show the menu bar\" back to Never."

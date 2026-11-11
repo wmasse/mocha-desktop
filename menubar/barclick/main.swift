@@ -9,7 +9,7 @@
 // With an argument it does one quick job and exits:
 //   barclick menubar                     same as Control-Option-Command-M
 //   barclick hide | hide-others | quit   act on the app in front (no permission prompts)
-//   barclick volume [+N|-N]              print "<volume> <muted>", changing it first by N
+//   barclick volume [+N|-N|=N]           print "<volume> <muted>", first changing it by N or to N%
 //   barclick mute                        toggle mute, then print like volume
 //   barclick strip <dir> <points>        cut the top of the current wallpaper, as macOS
 //                                        draws it, into <dir>; print the PNG's path and
@@ -158,7 +158,11 @@ if let action = args.first {
             where other != app && other.activationPolicy == .regular { other.hide() }
         }
     case "volume":
-        if args.count > 1, let step = Float32(args[1]) {
+        if args.count > 1, args[1].hasPrefix("="), let level = Float32(args[1].dropFirst()) {
+            // An exact level, from the volume menu's slider
+            setProperty(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, min(1, max(0, level / 100)))
+            if level > 0 { setProperty(kAudioDevicePropertyMute, UInt32(0)) }
+        } else if args.count > 1, let step = Float32(args[1]) {
             let volume = getProperty(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, Float32(0))
             let newVolume = min(1, max(0, volume + step / 100))
             setProperty(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, newVolume)

@@ -9,26 +9,29 @@
 ## What you get
 
 **Menu bar**
-- Pastel pills: Apple menu, current app, Amphetamine, volume, Wi‑Fi, battery, and date and time
+- Pills for the Apple menu, current app, Amphetamine, Low Power Mode, Do Not Disturb, volume, Wi‑Fi, battery, and date and time, in the current theme's colors and typeface
 - They sit on a strip cut from the top of your own wallpaper (it follows dynamic wallpapers through the day), so the bar blends into the desktop while covering Apple's menu bar
 - The notch stays empty, so apps that live there aren't covered
 - Click the current app to hide it, hide the others or quit it
 - Click the clock for Calendar or battery for its settings
 - Click Wi‑Fi for a menu to turn it off or on, or open its settings
-- Click volume to mute; scroll over it to change the volume
+- Click volume for a menu: what's playing in Spotify or Music (artwork, progress with time left, back, pause, next), a volume slider, mute, and your connected Bluetooth devices with their battery; scroll over the pill to change the volume
 - If [Amphetamine](https://apps.apple.com/app/amphetamine/id937984704) is installed, click the cup to keep your Mac awake for a while or until you turn it off, and optionally with the lid closed
+- Click the leaf to switch Low Power Mode (needs a one-time permission, which the installer explains); the battery pill turns amber whenever it's on. Click the moon for Do Not Disturb (needs a shortcut named "Mocha Do Not Disturb": Set Focus → Do Not Disturb → Toggle)
 - The Apple menu has Settings, Activity Monitor, Reload bars, Lock screen and Sleep
 - Need Apple's own menu bar (File, Edit…)? Press **Control‑Option‑Command‑M**, or pick **macOS Menu Bar** in the Apple menu. The Mocha bar steps aside and comes back once you're done
 - Menus close when you click anywhere else
 
 **Dock**
-- Squircle tiles in pastel colors, built from the apps already in your Dock
-- Running apps fill in with color; the app in front gets a ring
+- Tiles built from the apps already in your Dock; open apps are marked in the theme's style (filled, inverted or outlined) and the app in front gets a ring
 - Hover to see the app's name; the tile grows without moving the others, and keeps up however fast you move
 - Right-click for Open or Quit, Show in Finder, Move left or right, Add app, Remove from Dock
 - Drag files onto an app to open them with it, or onto the Trash to delete them
-- Themes: right-click any tile → **Theme…** for Catppuccin Mocha, Macchiato, Frappé or Latte, Nord or Gruvbox. The menu bar follows the dock's theme
-- Under the themes, **Customize** lets you pick your own colors for the tray and menus, empty tiles, text and the front-app ring, and icons on open apps (saved per theme)
+- Right-click the Trash to see every open app by its icon, with a button beside each to quit it
+- Sixteen themes in a gallery (right-click any tile → **Theme…**), each a full design: shapes, surfaces, how open apps look, and its own typeface. The menu bar follows the dock
+  - Classic: Catppuccin Mocha and Latte, Graphite, Paper, Nord Glass, Terminal
+  - Scenes, with scenery drawn behind the tray: Harvest, Dusk Lake, Alpenglow, Night Garden, Sakura, Aurora, Dune, Tide, Velvet, Matcha
+- **Customize colors…** picks your own tray, tile, text and icon colors (saved per theme)
 - Slides out of the way for full-screen apps and back when you leave
 
 **Window gaps**
@@ -58,7 +61,7 @@ The installer trusts SketchyBar's official Homebrew tap (`felixkratz/formulae`),
 |---|---|
 | Dock apps, order, icons and colors | Right-click a tile, or edit `~/.config/sketchybar-dock/apps.txt` |
 | Tile and hover size | `~/.config/sketchybar-dock/sizes.sh` |
-| Theme and colors | Right-click a tile → **Theme…**, or edit the palettes in `~/.config/sketchybar-dock/themes/` (the menu bar strip takes its colors from your wallpaper) |
+| Theme and colors | Right-click a tile → **Theme…**, or edit `~/.config/sketchybar-dock/themes/` (palettes and design) and `style.sh` (what each design setting does); scenery is drawn by `dock/dockart` |
 | Menu bar items | `~/.config/sketchybar/sketchybarrc` |
 
 After editing, use **Reload bars** in the Apple menu.
@@ -77,6 +80,8 @@ Open the app and click **Uninstall**, or run `./uninstall.sh`. It brings back Ap
   - **Hover:** SketchyBar runs a separate script for every mouse enter and exit, all at once, so quick back-and-forth movement made them land out of order and left the wrong tile grown or a name stuck. The helper checks where the pointer is 60 times a second and sends the dock one update, in order, only when the tile under it changes.
   - **Drag and drop:** SketchyBar can't receive drops, so the helper keeps an invisible window over the dock that only catches drops while a file drag is happening. Since macOS 27 that window isn't always told about the drop, so the helper also watches for the button coming up over a tile and handles the files itself.
   - **Menus:** it closes the dock's menus when you click elsewhere.
+  - **Panels:** the open-apps panel and the theme gallery are native panels drawn in the current theme (`apps.swift`, `gallery.swift`).
+- **Scenery:** `dock/dockart` draws each scene theme's scenery (gradients and simple shapes) at the tray's exact width.
 - **Installer app:** `app/` holds the installer app, which runs `install.sh` and shows its output.
 
 ## Build from source

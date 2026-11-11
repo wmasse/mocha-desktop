@@ -5,6 +5,9 @@
 // catching drops while a file drag is in progress. Dropping on an app tile
 // opens the files with that app; dropping on the trash moves them to the Trash.
 //
+// Right-clicking the trash opens the open-apps panel (apps.swift); Theme… opens the
+// theme gallery (gallery.swift).
+//
 // It also closes the bars' menus (the Apple menu and the dock's right-click
 // menus) when you click anywhere outside the bars, like a normal menu.
 //
@@ -157,6 +160,11 @@ final class DropView: NSView {
     }
 }
 
+func currentTheme() -> String {
+    (try? String(contentsOfFile: configDir + "/theme.txt", encoding: .utf8))?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? "mocha"
+}
+
 /// Grows the tile under the pointer and shows its name; every other tile rests
 /// with its name hidden. A hovered tile grows into its own padding, so the
 /// tiles next to it don't move.
@@ -187,6 +195,12 @@ final class Hover {
         RunLoop.main.add(poll, forMode: .common)   // keep running during drags and menus
     }
 
+    /// Where a tile's center is, and the top of the tray (top-left origin), for the open-apps panel
+    func anchor(for item: String) -> (midX: CGFloat, trayTop: CGFloat)? {
+        guard let spot = spots.first(where: { $0.item == item }) else { return nil }
+        return (spot.midX, barTop + 6)   // the 68pt tray sits centered in the 80pt bar
+    }
+
     /// Where each tile sits now, padding included (main thread)
     func currentSpots() -> [(item: String, minX: CGFloat, maxX: CGFloat)] {
         lock.lock(); let s = sizes; lock.unlock()
@@ -201,7 +215,11 @@ final class Hover {
             let items = (bar["items"] as? [String] ?? []).joined(separator: ",")
             let appsDate = (try? FileManager.default.attributesOfItem(atPath: configDir + "/apps.txt")[.modificationDate] as? Date)?
                 .timeIntervalSince1970 ?? 0
-            let sig = "\(items)|\(bar["margin"] ?? "")|\(appsDate)"
+            // A theme or color change reloads the dock and can change the tile corners
+            let lookDate = ["theme.txt", "custom-\(currentTheme()).sh"].map { name in
+                (try? FileManager.default.attributesOfItem(atPath: configDir + "/" + name)[.modificationDate] as? Date)?
+                    .timeIntervalSince1970 ?? 0 }
+            let sig = "\(items)|\(bar["margin"] ?? "")|\(appsDate)|\(lookDate)"
 
             var newSpots: [Spot]?
             var newSizes: Sizes?
@@ -231,7 +249,7 @@ final class Hover {
     }
 
     private func readSizes() -> Sizes {
-        let out = run("/bin/bash", ["-c", "source \"$CONFIG_DIR/sizes.sh\"; echo $TILE $TILE_GAP $TILE_RADIUS"])
+        let out = run("/bin/bash", ["-c", "source \"$CONFIG_DIR/colors.sh\"; source \"$CONFIG_DIR/sizes.sh\"; echo $TILE $TILE_GAP $TILE_RADIUS"])
         let n = (String(data: out, encoding: .utf8) ?? "").split(separator: " ").compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
         guard n.count == 3 else { return Sizes() }
         return Sizes(tile: n[0], gap: n[1], radius: n[2])
@@ -275,7 +293,7 @@ final class Hover {
     private func size(_ step: Int, _ s: Sizes) -> [String] {
         let size = s.tile + 2 * step, pad = s.gap - step
         return ["icon.width=\(size)", "padding_left=\(pad)", "padding_right=\(pad)",
-                "background.height=\(size)", "background.corner_radius=\(s.radius + step / 2)"]
+                "background.height=\(size)", "background.corner_radius=\(s.radius * size / s.tile)"]   // corners grow with the tile, so circles stay round
     }
 
     private func show(_ item: String?, _ s: Sizes) {
@@ -313,6 +331,8 @@ final class Helper: NSObject, NSApplicationDelegate {
     private var restingChangeCount = 0
     private var catching = false
     private let hover = Hover()
+    private let appsPanel = AppsPanel()
+    private let gallery = ThemeGallery()
 
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -329,8 +349,23 @@ final class Helper: NSObject, NSApplicationDelegate {
         restingChangeCount = dragBoard.changeCount
 
         // Mouse-down monitoring needs no permissions (only keyboard monitoring does)
-        NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
+        NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             closeMenusIfClickedOutside()
+            self?.appsPanel.clickedAt(NSEvent.mouseLocation)
+            self?.gallery.clickedAt(NSEvent.mouseLocation)
+        }
+
+        // Theme… (plugins/menu.sh) asks for the theme gallery, centered over the dock
+        DistributedNotificationCenter.default().addObserver(forName: toggleGalleryNote, object: nil, queue: .main) { [weak self] _ in
+            guard let self, let spot = self.hover.anchor(for: "trash") else { return }
+            self.appsPanel.close()
+            self.gallery.toggle(midX: NSScreen.screens.first?.frame.midX ?? spot.midX, trayTop: spot.trayTop)
+        }
+
+        // Right-clicking the trash (plugins/menu.sh) asks for the open-apps panel
+        DistributedNotificationCenter.default().addObserver(forName: toggleAppsNote, object: nil, queue: .main) { [weak self] _ in
+            guard let self, let spot = self.hover.anchor(for: "trash") else { return }
+            self.appsPanel.toggle(midX: spot.midX, trayTop: spot.trayTop)
         }
 
         hover.start()
@@ -414,6 +449,13 @@ final class Helper: NSObject, NSApplicationDelegate {
             self.window.orderOut(nil)
         }
     }
+}
+
+// dockdrop apps | themes: open or close the open-apps panel or the theme gallery in the running helper
+if let command = CommandLine.arguments.dropFirst().first, command == "apps" || command == "themes" {
+    DistributedNotificationCenter.default().postNotificationName(command == "apps" ? toggleAppsNote : toggleGalleryNote,
+                                                                 object: nil, userInfo: nil, deliverImmediately: true)
+    exit(0)
 }
 
 let app = NSApplication.shared

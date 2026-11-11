@@ -1,5 +1,5 @@
 #!/bin/bash
-# Catppuccin Mocha (0xAARRGGBB)
+# Catppuccin Mocha: Pastel squircles on soft charcoal, every app in its own color (colors are 0xAARRGGBB)
 export THEME_NAME="Catppuccin Mocha"
 export BASE=0xff1e1e2e
 export SURFACE0=0xff313244

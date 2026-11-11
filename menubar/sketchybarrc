@@ -28,11 +28,13 @@ sketchybar --bar position=top \
 CONFIG_DIR="$CONFIG_DIR" "$PLUGIN_DIR/wallpaper.sh"
 
 sketchybar --default icon.font="$FONT:Bold:15.0" \
-                     label.font="$FONT:Bold:13.0" \
+                     label.font="$LABEL_FONT:$LABEL_BOLD:13.0" \
                      icon.color=$TEXT \
                      label.color=$TEXT \
-                     background.color=$SURFACE0 \
-                     background.corner_radius=12 \
+                     background.color=$PILL_COLOR \
+                     background.corner_radius=$PILL_RADIUS \
+                     background.border_width=$PILL_BORDER_WIDTH \
+                     background.border_color=$PILL_BORDER_COLOR \
                      background.height=26 \
                      padding_left=3 \
                      padding_right=3 \
@@ -42,23 +44,27 @@ sketchybar --default icon.font="$FONT:Bold:15.0" \
                      label.padding_right=10
 
 HOVER_EVENTS="mouse.entered mouse.exited"
+sketchybar --add event lowpower_change   # fired by the leaf, so the battery updates at once
 
 # ── Left: Apple pill (click for a small menu) + current app ──
 sketchybar --add item apple left \
            --set apple icon="$G_APPLE" \
-                       icon.color=$BASE \
+                       icon.color=$APPLE_ICON_COLOR \
                        icon.padding_right=10 \
                        label.drawing=off \
-                       background.color=$PINK \
-                       popup.background.color=$SURFACE0 \
-                       popup.background.corner_radius=12 \
-                       popup.background.border_width=2 \
-                       popup.background.border_color=$PINK \
+                       background.color=$APPLE_COLOR \
+                       background.border_width=0 \
+                       popup.background.color=$MENU_COLOR \
+                       popup.background.corner_radius=$MENU_RADIUS \
+                       popup.background.border_width=1 \
+                       popup.background.border_color=$MENU_BORDER_COLOR \
+                       popup.height=38 \
                        click_script="sketchybar --set apple popup.drawing=toggle"
 
 menu_item() { # name icon color label command
   sketchybar --add item "apple.$1" popup.apple \
              --set "apple.$1" icon="$2" icon.color="$3" label="$4" background.drawing=off \
+                   padding_left=10 padding_right=18 icon.padding_left=12 \
                    click_script="sketchybar --set apple popup.drawing=off; $5"
 }
 menu_item settings "$G_GEAR"     $MAUVE "Settings"         "open -a 'System Settings'"
@@ -75,15 +81,17 @@ sketchybar --add item front_app left \
                            label.max_chars=22 \
                            script="$PLUGIN_DIR/front_app.sh" \
                            click_script="sketchybar --set front_app popup.drawing=toggle" \
-                           popup.background.color=$SURFACE0 \
-                           popup.background.corner_radius=12 \
-                           popup.background.border_width=2 \
-                           popup.background.border_color=$LAVENDER \
+                           popup.background.color=$MENU_COLOR \
+                           popup.background.corner_radius=$MENU_RADIUS \
+                           popup.background.border_width=1 \
+                           popup.background.border_color=$MENU_BORDER_COLOR \
+                           popup.height=38 \
            --subscribe front_app front_app_switched
 
 app_item() { # name icon color label action
   sketchybar --add item "front_app.$1" popup.front_app \
              --set "front_app.$1" icon="$2" icon.color="$3" label="$4" background.drawing=off \
+                   padding_left=10 padding_right=18 icon.padding_left=12 \
                    click_script="sketchybar --set front_app popup.drawing=off; '$BARCLICK' $5"
 }
 app_item hide   "$G_HIDE" $LAVENDER "Hide"        hide
@@ -101,9 +109,9 @@ sketchybar --add item clock right \
 
 sketchybar --add item battery right \
            --set battery icon.color=$YELLOW label.color=$YELLOW \
-                         update_freq=120 script="$PLUGIN_DIR/battery.sh" \
+                         update_freq=30 script="$PLUGIN_DIR/battery.sh" \
                          click_script="open 'x-apple.systempreferences:com.apple.Battery-Settings.extension'" \
-           --subscribe battery system_woke power_source_change $HOVER_EVENTS
+           --subscribe battery system_woke power_source_change lowpower_change $HOVER_EVENTS
 
 # Wi-Fi: click for a menu to turn it off or on, or open Wi-Fi settings
 WIFI="CONFIG_DIR=$CONFIG_DIR NAME=wifi $PLUGIN_DIR/wifi.sh"
@@ -112,26 +120,107 @@ sketchybar --add item wifi right \
                       update_freq=30 script="$PLUGIN_DIR/wifi.sh" \
                       click_script="$WIFI menu" \
                       popup.align=right \
-                      popup.background.color=$SURFACE0 \
-                      popup.background.corner_radius=12 \
-                      popup.background.border_width=2 \
-                      popup.background.border_color=$GREEN \
+                      popup.background.color=$MENU_COLOR \
+                      popup.background.corner_radius=$MENU_RADIUS \
+                      popup.background.border_width=1 \
+                      popup.background.border_color=$MENU_BORDER_COLOR \
+                      popup.height=38 \
            --subscribe wifi wifi_change system_woke $HOVER_EVENTS \
            --add item wifi.status popup.wifi \
-           --set wifi.status icon.drawing=off label.color=$OVERLAY \
+           --set wifi.status padding_left=10 padding_right=18 icon.drawing=off label.color=$OVERLAY \
                              label.padding_left=10 background.drawing=off \
            --add item wifi.power popup.wifi \
-           --set wifi.power icon="$G_WIFI_OFF" background.drawing=off click_script="$WIFI power" \
+           --set wifi.power padding_left=10 padding_right=18 icon="$G_WIFI_OFF" background.drawing=off click_script="$WIFI power" \
            --add item wifi.settings popup.wifi \
-           --set wifi.settings icon="$G_GEAR" icon.color=$MAUVE label="Wi-Fi Settings…" background.drawing=off \
+           --set wifi.settings padding_left=10 padding_right=18 icon="$G_GEAR" icon.color=$MAUVE label="Wi-Fi Settings…" background.drawing=off \
                                click_script="sketchybar --set wifi popup.drawing=off; open 'x-apple.systempreferences:com.apple.wifi-settings-extension'"
 
-# Click to mute or unmute, scroll over it to change the volume
+# Volume: click for a menu (slider, mute, connected Bluetooth devices); scroll over
+# the pill to change the volume
+VOL="CONFIG_DIR=$CONFIG_DIR NAME=volume $PLUGIN_DIR/volume.sh"
 sketchybar --add item volume right \
            --set volume icon.color=$BLUE label.color=$BLUE \
                         script="$PLUGIN_DIR/volume.sh" \
-                        click_script="CONFIG_DIR=$CONFIG_DIR NAME=volume $PLUGIN_DIR/volume.sh mute" \
+                        click_script="$VOL menu" \
+                        popup.align=right \
+                        popup.height=38 \
+                        popup.background.color=$MENU_COLOR \
+                        popup.background.corner_radius=$MENU_RADIUS \
+                        popup.background.border_width=1 \
+                        popup.background.border_color=$MENU_BORDER_COLOR \
            --subscribe volume volume_change mouse.scrolled $HOVER_EVENTS
+
+# Now Playing rows, at the top of the volume menu; hidden until something plays
+# (plugins/volume.sh fills them in when the menu opens)
+np_row() { # name icon label action — a clickable control row
+  sketchybar --add item "volume.np.$1" popup.volume \
+             --set "volume.np.$1" icon="$2" icon.color=$TEXT icon.width=28 icon.padding_left=14 \
+                   label="$3" label.color=$SUBTEXT label.padding_left=6 width=276 drawing=off \
+                   background.drawing=on background.color=$MENU_COLOR background.height=30 \
+                   background.corner_radius=9 background.border_width=0 padding_left=12 padding_right=12 \
+                   script="$PLUGIN_DIR/row.sh" click_script="$VOL $4" \
+             --subscribe "volume.np.$1" $HOVER_EVENTS
+}
+sketchybar --add item volume.np.title popup.volume \
+           --set volume.np.title icon.width=30 icon.padding_left=0 padding_left=16 icon.color=$PINK \
+                                 label.color=$TEXT label.max_chars=22 label.padding_left=12 \
+                                 width=276 drawing=off background.drawing=off \
+                                 click_script="$VOL player" \
+           --add item volume.np.artist popup.volume \
+           --set volume.np.artist icon.drawing=off label.color=$OVERLAY label.max_chars=26 label.font.size=12 \
+                                  label.padding_left=55 width=276 drawing=off background.drawing=off
+sketchybar --add slider volume.np.progress popup.volume 150 \
+           --set volume.np.progress icon="0:00" icon.font="$LABEL_FONT:$LABEL_REGULAR:11.0" icon.color=$OVERLAY \
+                                    icon.width=40 icon.padding_left=16 icon.padding_right=8 \
+                                    label="-0:00" label.font="$LABEL_FONT:$LABEL_REGULAR:11.0" label.color=$OVERLAY \
+                                    label.drawing=on label.padding_left=10 drawing=off \
+                                    slider.highlight_color=$PINK slider.background.height=4 \
+                                    slider.background.corner_radius=2 slider.background.color=$MENU_BORDER_COLOR \
+                                    slider.knob.drawing=off background.drawing=off script="$VOL seek" \
+           --subscribe volume.np.progress mouse.clicked
+np_row back "$G_PREV" "Back" back
+np_row play "$G_PAUSE" "Pause" play
+np_row next "$G_NEXT" "Next" next
+sketchybar --add item volume.np.rule popup.volume \
+           --set volume.np.rule icon.drawing=off label.drawing=off width=276 drawing=off \
+                                background.drawing=on background.color=$MENU_BORDER_COLOR background.height=1 \
+                                background.corner_radius=0 padding_left=12 padding_right=12
+
+sketchybar --add slider volume.slider popup.volume 200 \
+           --set volume.slider icon="$G_VOL_2" icon.color=$BLUE icon.width=28 icon.padding_left=14 \
+                               label.drawing=off padding_right=14 \
+                               slider.highlight_color=$BLUE \
+                               slider.background.height=6 \
+                               slider.background.corner_radius=3 \
+                               slider.background.color=$MENU_BORDER_COLOR \
+                               slider.knob="$G_KNOB" slider.knob.font="$FONT:Bold:14.0" \
+                               slider.knob.color=$TEXT slider.knob.drawing=on \
+                               script="$VOL set" background.drawing=off \
+           --subscribe volume.slider mouse.clicked \
+           --add item volume.mute popup.volume \
+           --set volume.mute icon="$G_VOL_MUTE" icon.color=$OVERLAY icon.width=28 icon.padding_left=14 \
+                             label="Mute" label.color=$SUBTEXT label.padding_left=6 width=276 \
+                             background.drawing=on background.color=$MENU_COLOR background.height=30 background.border_width=0 \
+                             background.corner_radius=9 padding_left=12 padding_right=12 \
+                             script="$PLUGIN_DIR/row.sh" click_script="$VOL mute" \
+           --subscribe volume.mute $HOVER_EVENTS \
+           --add item volume.rule popup.volume \
+           --set volume.rule icon.drawing=off label.drawing=off width=276 \
+                             background.drawing=on background.color=$MENU_BORDER_COLOR background.height=1 \
+                             background.corner_radius=0 padding_left=12 padding_right=12 \
+           --add item volume.section popup.volume \
+           --set volume.section icon.drawing=off label="BLUETOOTH" label.font="$LABEL_FONT:$LABEL_BOLD:11.0" \
+                                label.color=$OVERLAY label.padding_left=16 width=276 background.drawing=off
+
+# Low Power Mode and Do Not Disturb: click to toggle (each runs a one-step shortcut,
+# see plugins/toggles.sh)
+for toggle in dnd lowpower; do
+  sketchybar --add item $toggle right \
+             --set $toggle label.drawing=off icon.padding_right=10 \
+                           update_freq=60 script="$PLUGIN_DIR/toggles.sh" \
+                           click_script="CONFIG_DIR=$CONFIG_DIR NAME=$toggle $PLUGIN_DIR/toggles.sh toggle" \
+             --subscribe $toggle system_woke power_source_change $HOVER_EVENTS
+done
 
 # Amphetamine: click the cup for a menu to keep the Mac awake for a while
 if [ -d /Applications/Amphetamine.app ]; then
@@ -141,21 +230,21 @@ if [ -d /Applications/Amphetamine.app ]; then
                                update_freq=30 script="$PLUGIN_DIR/amphetamine.sh" \
                                click_script="$AMPH menu" \
                                popup.align=right \
-                               popup.background.color=$SURFACE0 \
-                               popup.background.corner_radius=12 \
+                               popup.background.color=$MENU_COLOR \
+                               popup.background.corner_radius=$MENU_RADIUS \
                                popup.background.border_width=1 \
-                               popup.background.border_color=$SURFACE1 \
-                               popup.background.corner_radius=14 \
-                               popup.height=32 \
+                               popup.background.border_color=$MENU_BORDER_COLOR \
+                               popup.background.corner_radius=$MENU_RADIUS \
+                               popup.height=38 \
              --subscribe amphetamine system_woke $HOVER_EVENTS
 
   # The menu: a header with a status chip, the lid switch, how long to stay
   # awake, and Turn off. Every row has the same width and every line of text a
   # character limit, so nothing can run past the menu's edge.
-  AMPH_W=272
+  AMPH_W=286
   amph_chip() { # name — a rounded chip of text (colors are set by amphetamine.sh)
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
-               --set "amphetamine.$1" icon.drawing=off label.font="$FONT:Bold:12.0" label.max_chars=32 \
+               --set "amphetamine.$1" icon.drawing=off label.font="$LABEL_FONT:$LABEL_BOLD:12.0" label.max_chars=32 \
                      label.padding_left=10 label.padding_right=10 \
                      label.background.drawing=on label.background.height=22 label.background.corner_radius=11 \
                      padding_left=14 width=$AMPH_W background.drawing=off
@@ -163,22 +252,22 @@ if [ -d /Applications/Amphetamine.app ]; then
   amph_rule() { # name — a thin line between sections
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
                --set "amphetamine.$1" icon.drawing=off label.drawing=off width=$AMPH_W \
-                     background.drawing=on background.color=$SURFACE1 background.height=1 \
+                     background.drawing=on background.color=$MENU_BORDER_COLOR background.height=1 \
                      background.corner_radius=0 padding_left=12 padding_right=12
   }
   amph_row() { # name icon color label args — a clickable row that lights up on hover
     sketchybar --add item "amphetamine.$1" popup.amphetamine \
                --set "amphetamine.$1" icon="$2" icon.color="$3" icon.width=28 icon.padding_left=10 \
                      label="$4" label.color=$SUBTEXT label.max_chars=26 label.padding_left=6 width=$AMPH_W \
-                     background.drawing=on background.color=$SURFACE0 background.height=30 \
-                     background.corner_radius=9 padding_left=6 padding_right=6 \
+                     background.drawing=on background.color=$MENU_COLOR background.height=30 background.border_width=0 \
+                     background.corner_radius=9 padding_left=12 padding_right=12 \
                      script="$PLUGIN_DIR/row.sh" click_script="$AMPH $5" \
                --subscribe "amphetamine.$1" $HOVER_EVENTS
   }
 
   sketchybar --add item amphetamine.title popup.amphetamine \
              --set amphetamine.title icon="$G_AWAKE_OFF" icon.font="$FONT:Bold:18.0" icon.padding_left=16 \
-                                     icon.padding_right=8 label="Amphetamine" label.font="$FONT:Bold:15.0" \
+                                     icon.padding_right=8 label="Amphetamine" label.font="$LABEL_FONT:$LABEL_BOLD:15.0" \
                                      label.color=$TEXT width=$AMPH_W background.drawing=off
   amph_chip status
   amph_rule rule1
@@ -188,13 +277,13 @@ if [ -d /Applications/Amphetamine.app ]; then
   sketchybar --set amphetamine.warning drawing=off
   amph_rule rule2
   sketchybar --add item amphetamine.section popup.amphetamine \
-             --set amphetamine.section icon.drawing=off label="KEEP AWAKE FOR" label.font="$FONT:Bold:11.0" \
+             --set amphetamine.section icon.drawing=off label="KEEP AWAKE FOR" label.font="$LABEL_FONT:$LABEL_BOLD:11.0" \
                                        label.color=$OVERLAY label.padding_left=16 width=$AMPH_W background.drawing=off
-  amph_row  forever "$G_INFINITY" $PEACH  "Until I turn it off" "start forever"
-  amph_row  30m     "$G_TIMER"    $YELLOW "30 minutes"          "start 30m 30 minutes"
-  amph_row  1h      "$G_TIMER"    $YELLOW "1 hour"              "start 1h 1 hours"
-  amph_row  2h      "$G_TIMER"    $YELLOW "2 hours"             "start 2h 2 hours"
-  amph_row  4h      "$G_TIMER"    $YELLOW "4 hours"             "start 4h 4 hours"
+  amph_row  forever "$G_INFINITY" $PEACH  "Until I turn it off" "start"
+  amph_row  30m     "$G_TIMER"    $YELLOW "30 minutes"          "start 30 minutes"
+  amph_row  1h      "$G_TIMER"    $YELLOW "1 hour"              "start 1 hours"
+  amph_row  2h      "$G_TIMER"    $YELLOW "2 hours"             "start 2 hours"
+  amph_row  4h      "$G_TIMER"    $YELLOW "4 hours"             "start 4 hours"
   amph_rule rule3
   amph_row  off     "$G_AWAKE_OFF" $RED   "Turn off"            "off"
   sketchybar --set amphetamine.off label.color=$RED

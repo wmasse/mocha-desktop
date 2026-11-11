@@ -99,6 +99,9 @@ PLIST
   echo "    If Apple's menu bar still shows, set System Settings → Control Center →"
   echo "    \"Automatically hide and show the menu bar\" to Always."
   echo "    Press Control-Option-Command-M any time to use Apple's menu bar."
+  echo "    For the Low Power button, allow it once (asks for your password):"
+  echo "      printf '%s ALL=(root) NOPASSWD: /usr/bin/pmset -a lowpowermode 0, /usr/bin/pmset -a lowpowermode 1\\n' \"\$USER\" > /tmp/mocha-lowpower && visudo -cf /tmp/mocha-lowpower && sudo install -m 440 -o root -g wheel /tmp/mocha-lowpower /etc/sudoers.d/mocha-lowpower"
+  echo "    For the Do Not Disturb button, make a shortcut named \"Mocha Do Not Disturb\" (Set Focus → Do Not Disturb → Toggle)."
 fi
 
 if wants dock; then
@@ -133,13 +136,24 @@ if wants dock; then
   mkdir -p "$DEST/bin"
   ln -sf "$(brew --prefix)/bin/sketchybar" "$DEST/bin/mochadock"
 
-  # Dock helper (hover and drag and drop): use the prebuilt one if this copy has it, else build it
+  # Dock helper (hover, drag and drop, the open-apps panel, the theme gallery) and
+  # dockart (the scenery behind the tray): use prebuilt ones if this copy has them, else build them
+  CAN_BUILD=false
+  { command -v swiftc >/dev/null || xcrun --find swiftc >/dev/null 2>&1; } && CAN_BUILD=true
   if [ -x "$REPO/dock/bin/dockdrop" ]; then
     cp "$REPO/dock/bin/dockdrop" "$DEST/bin/dockdrop"
-  elif command -v swiftc >/dev/null || xcrun --find swiftc >/dev/null 2>&1; then
-    "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" || echo "    couldn't build the dock helper; the dock works, but without hover or drag and drop"
+  elif $CAN_BUILD; then
+    "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" \
+      "$REPO/dock/dockdrop/apps.swift" "$REPO/dock/dockdrop/gallery.swift" \
+      || echo "    couldn't build the dock helper; the dock works, but without hover, drag and drop or its panels"
   else
-    echo "    skipped the dock helper for hover and drag and drop (needs Xcode Command Line Tools: xcode-select --install)"
+    echo "    skipped the dock helper (needs Xcode Command Line Tools: xcode-select --install)"
+  fi
+  if [ -x "$REPO/dock/bin/dockart" ]; then
+    cp "$REPO/dock/bin/dockart" "$DEST/bin/dockart"
+  elif $CAN_BUILD; then
+    "$REPO/scripts/swift-build.sh" "$DEST/bin/dockart" native "$REPO/dock/dockart/main.swift" \
+      || echo "    couldn't build dockart; scene themes show their plain tray color"
   fi
 
   mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"

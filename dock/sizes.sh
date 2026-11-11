@@ -1,7 +1,8 @@
 #!/bin/bash
-# Tile sizes. Corner radius is ~28% of the tile so it reads as a squircle.
+# Tile sizes. The corner radius comes from the theme (style.sh: THEME_TILE_RADIUS,
+# 15 by default, ~28% of the tile so it reads as a squircle); source colors.sh first.
 export TILE=52
-export TILE_RADIUS=15
+export TILE_RADIUS=${THEME_TILE_RADIUS:-15}
 export TILE_FONT=26
 export TILE_GAP=4        # padding on each side of a tile; a hovered tile grows
                          # by this much on each side, into its own padding,

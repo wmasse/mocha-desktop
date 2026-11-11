@@ -6,3 +6,5 @@ menubar/bin/
 menubar/cache/
 dock/theme.txt
 dock/custom-*.sh
+dock/cache/
+dock/dockdrop/dockdrop

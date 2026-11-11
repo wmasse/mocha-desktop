@@ -4,7 +4,7 @@
 # with the lid closed, or turn it off.
 #   amphetamine.sh                  refresh the cup and the menu
 #   amphetamine.sh menu             open or close the menu
-#   amphetamine.sh start <key> [n hours|minutes]   start a session (no length: until turned off)
+#   amphetamine.sh start [n hours|minutes]   start a session (no length: until turned off)
 #   amphetamine.sh lid              turn "stay awake with lid closed" on or off
 #   amphetamine.sh off              end the session
 CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar}"
@@ -14,7 +14,6 @@ source "$CONFIG_DIR/plugins/hover.sh"
 ITEM=amphetamine
 STATE="$CONFIG_DIR/cache"
 LID_FILE="$STATE/amphetamine-lid"        # present = keep awake with the lid closed
-CHOICE_FILE="$STATE/amphetamine-choice"  # which option started the current session
 OPTIONS="forever 30m 1h 2h 4h"
 mkdir -p "$STATE"
 
@@ -33,13 +32,12 @@ case "$1" in
     OPEN_MENU=1
     ;;
   start)
-    if [ -n "$3" ]; then
-      amphetamine "start new session with options {duration:$3, interval:$4, displaySleepAllowed:false}"
+    if [ -n "$2" ]; then
+      amphetamine "start new session with options {duration:$2, interval:$3, displaySleepAllowed:false}"
     else
       amphetamine "start new session with options {displaySleepAllowed:false}"
     fi
     lid_wanted && amphetamine 'enable closed display mode'
-    echo "$2" > "$CHOICE_FILE"
     sketchybar --set $ITEM popup.drawing=off
     ;;
   lid)
@@ -54,7 +52,6 @@ case "$1" in
     ;;
   off)
     amphetamine 'end session'
-    rm -f "$CHOICE_FILE"
     sketchybar --set $ITEM popup.drawing=off
     ;;
 esac
@@ -78,14 +75,17 @@ if [ "$ACTIVE" = "true" ]; then
          --set $ITEM.status label="$STATUS" label.color=$PEACH label.background.color="$(tint $PEACH)"
          --set $ITEM.rule3 drawing=on
          --set $ITEM.off drawing=on)
+  SHOW_OPTIONS=off   # while it's running, the menu only needs Turn off
 else
-  rm -f "$CHOICE_FILE"
   ARGS+=(--set $ITEM icon="$G_AWAKE_OFF" icon.color=$OVERLAY
          --set $ITEM.title icon="$G_AWAKE_OFF" icon.color=$OVERLAY
          --set $ITEM.status label="Off · sleeps as usual" label.color=$OVERLAY label.background.color="$(tint $OVERLAY)"
          --set $ITEM.rule3 drawing=off
          --set $ITEM.off drawing=off)
+  SHOW_OPTIONS=on
 fi
+ARGS+=(--set $ITEM.rule2 drawing=$SHOW_OPTIONS --set $ITEM.section drawing=$SHOW_OPTIONS)
+for key in $OPTIONS; do ARGS+=(--set $ITEM.$key drawing=$SHOW_OPTIONS); done
 
 # Lid switch, and a warning chip when it would run the battery down
 if lid_wanted; then
@@ -101,18 +101,6 @@ else
   ARGS+=(--set $ITEM.lid icon="$G_TOGGLE_OFF" icon.color=$OVERLAY label.color=$SUBTEXT
          --set $ITEM.warning drawing=off)
 fi
-
-# The option that's running gets a green check
-CHOICE="$(cat "$CHOICE_FILE" 2>/dev/null)"
-for key in $OPTIONS; do
-  if [ "$ACTIVE" = "true" ] && [ "$key" = "$CHOICE" ]; then
-    ARGS+=(--set $ITEM.$key icon="$G_CHECK" icon.color=$GREEN label.color=$GREEN)
-  elif [ "$key" = "forever" ]; then
-    ARGS+=(--set $ITEM.$key icon="$G_INFINITY" icon.color=$PEACH label.color=$SUBTEXT)
-  else
-    ARGS+=(--set $ITEM.$key icon="$G_TIMER" icon.color=$YELLOW label.color=$SUBTEXT)
-  fi
-done
 
 [ -n "$OPEN_MENU" ] && ARGS+=(--set $ITEM popup.drawing=on)
 sketchybar "${ARGS[@]}"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Catppuccin Latte (0xAARRGGBB)
+# Catppuccin Latte: The light pastel version of Mocha (colors are 0xAARRGGBB)
 export THEME_NAME="Catppuccin Latte"
 export BASE=0xffeff1f5
 export SURFACE0=0xffccd0da

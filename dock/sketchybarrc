@@ -29,9 +29,9 @@ mochadock --bar position=bottom \
                 topmost=window
 
 mochadock --default icon.font="$FONT:Bold:$TILE_FONT.0" \
-                    label.font="$FONT:Bold:13.0" \
+                    label.font="$LABEL_FONT:$LABEL_BOLD:13.0" \
                     label.color=$TEXT \
-                    label.font="$FONT:Bold:13.0" \
+                    label.font="$LABEL_FONT:$LABEL_BOLD:13.0" \
                     label.color=$TEXT \
                     icon.width=$TILE \
                     icon.align=center \
@@ -43,11 +43,11 @@ mochadock --default icon.font="$FONT:Bold:$TILE_FONT.0" \
                     padding_left=$TILE_GAP \
                     padding_right=$TILE_GAP \
                     popup.align=center \
-                    popup.height=34 \
-                    popup.background.color=$SURFACE0 \
-                    popup.background.corner_radius=14 \
+                    popup.height=40 \
+                    popup.background.color=$MENU_COLOR \
+                    popup.background.corner_radius=$MENU_RADIUS \
                     popup.background.border_width=1 \
-                    popup.background.border_color=$SURFACE1
+                    popup.background.border_color=$MENU_BORDER_COLOR
 
 # Click handler with everything baked in, so a left click opens the app
 # immediately: launch first, then a quick press dip that springs back
@@ -64,31 +64,42 @@ name_label() { # item, label
                                    background.drawing=off
 }
 
+IDLE_COLORS=($TILE_IDLE_COLORS)   # a collage, if the theme has one
+TILE_INDEX=0
 while IFS='|' read -r -u 3 key path bundle glyph color; do
   case "$key" in ''|\#*) continue ;; esac
+  IDLE=$TILE_IDLE_COLOR
+  [ ${#IDLE_COLORS[@]} -gt 0 ] && IDLE=${IDLE_COLORS[$(( TILE_INDEX % ${#IDLE_COLORS[@]} ))]}
+  TILE_INDEX=$(( TILE_INDEX + 1 ))
   mochadock --add item "app.$key" center \
             --set "app.$key" icon="$glyph" \
-                             icon.color="${!color}" \
-                             background.color=$SURFACE1 \
+                             icon.color="$( [ "$ICON_STYLE" = mono ] && echo $TEXT || echo ${!color} )" \
+                             background.color=$IDLE \
+                             background.border_width=$TILE_BORDER_WIDTH \
+                             background.border_color=$TILE_BORDER_COLOR \
                              click_script="$(click "app.$key" "open -b $bundle")"
   name_label "app.$key" "$(basename "$path" .app)"
 done 3< "$APPS_FILE"
 
+# A thin line before the trash. Its 2pt width comes from its (empty) icon: with a
+# fixed width= SketchyBar skips the padding and the trash slid over the line.
 mochadock --add item divider center \
-          --set divider icon.drawing=off background.color=$SURFACE1 \
-                        background.height=34 width=2 padding_left=8 padding_right=8 \
+          --set divider icon="" icon.width=2 label.drawing=off background.color=$TRAY_BORDER_COLOR \
+                        background.height=34 background.corner_radius=1 padding_left=8 padding_right=8 \
           --add item trash center \
           --set trash icon="$G_TRASH" icon.color=$TEXT \
-                      background.color=$SURFACE1 \
+                      background.color=$TILE_IDLE_COLOR \
+                      background.border_width=$TILE_BORDER_WIDTH \
+                      background.border_color=$TILE_BORDER_COLOR \
                       click_script="$(click trash "open $HOME/.Trash")"
 name_label trash "Trash"
 
 mochadock --add bracket dock '/app\..*/' divider trash \
-          --set dock background.color=$SURFACE0 \
-                     background.corner_radius=24 \
+          --set dock background.color=$TRAY_COLOR \
+                     background.corner_radius=$TRAY_RADIUS \
                      background.height=$TRAY_HEIGHT \
-                     background.border_width=1 \
-                     background.border_color=$SURFACE1
+                     background.border_width=$TRAY_BORDER_WIDTH \
+                     background.border_color=$TRAY_BORDER_COLOR
 
 # Invisible item that keeps running state and the focus ring current
 mochadock --add item refresh left \
@@ -101,6 +112,9 @@ mochadock --add item fullscreen left \
           --subscribe fullscreen space_change display_change system_woke
 
 mochadock --update
+
+# Scenery behind the tray (themes based on a picture), now that its width is known
+CONFIG_DIR="$CONFIG_DIR" "$PLUGIN_DIR/scenery.sh"
 
 # Hover and drag-and-drop helper (dockdrop/main.swift): started once, keeps running across reloads
 if [ -x "$CONFIG_DIR/bin/dockdrop" ] && ! pgrep -f "$CONFIG_DIR/bin/dockdrop" >/dev/null; then

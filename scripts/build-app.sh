@@ -16,8 +16,10 @@ echo "==> App"
 echo "==> Payload (the installer and everything it installs)"
 cp -R "$REPO/install.sh" "$REPO/uninstall.sh" "$REPO/menubar" "$REPO/dock" "$REPO/wallpaper" "$REPO/scripts" "$PAYLOAD/"
 rm -f "$PAYLOAD/dock/apps.txt"   # each Mac builds its own from its Dock
-rm -rf "$PAYLOAD/menubar/bin" "$PAYLOAD/menubar/cache"   # anything built locally; prebuilt below
-"$REPO/scripts/swift-build.sh" "$PAYLOAD/dock/bin/dockdrop" universal "$REPO/dock/dockdrop/main.swift"
+rm -rf "$PAYLOAD/menubar/bin" "$PAYLOAD/menubar/cache" "$PAYLOAD/dock/cache"   # anything built locally; prebuilt below
+"$REPO/scripts/swift-build.sh" "$PAYLOAD/dock/bin/dockdrop" universal "$REPO/dock/dockdrop/main.swift" \
+  "$REPO/dock/dockdrop/apps.swift" "$REPO/dock/dockdrop/gallery.swift"
+"$REPO/scripts/swift-build.sh" "$PAYLOAD/dock/bin/dockart" universal "$REPO/dock/dockart/main.swift"
 "$REPO/scripts/swift-build.sh" "$PAYLOAD/menubar/bin/barclick" universal "$REPO/menubar/barclick/main.swift"
 "$REPO/scripts/build-sketchybar.sh" "$PAYLOAD/menubar/bin/sketchybar" universal
 
