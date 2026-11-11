@@ -266,6 +266,146 @@ let scenes: [String: (CGContext) -> Void] = [
             sparkle(ctx, x: x, y: y, r: 3.2, tones[i % tones.count], 0.95)
         }
     },
+
+    // ---- Made to go with the Candy Orbit wallpaper (its colors are sampled from it) ----
+
+    // Daybreak: the wallpaper's whole day in one ribbon, left to right: night, dawn
+    // magenta, morning peach, noon blue, the gold afternoon, dusk, night again. It shows
+    // in the bands around the tiles; the sun sits in the noon gap, stars at night
+    "daybreak": { ctx in
+        horizontal(ctx, [(0, "211158"), (0.11, "963e89"), (0.22, "ffaaad"), (0.34, "fecf99"), (0.46, "d4e5d8"),
+                         (0.56, "9addfe"), (0.68, "fcc56d"), (0.79, "ba454b"), (0.89, "612975"), (1, "211158")])
+        vertical(ctx, [(0, "ffffff"), (0.5, "ffffff"), (1, "000000")], alpha: 0.10)
+        let noon = gaps.min(by: { abs($0 - W * 0.53) < abs($1 - W * 0.53) }) ?? W / 2
+        for x in gaps {
+            let t = x / W
+            if x == noon { glow(ctx, x: x, y: 0.5, radius: 22, "fff6cf", 0.9); dot(ctx, x: x, y: 0.5, r: 2.8, "fffbea", 1) }
+            else if t < 0.16 || t > 0.84 { sparkle(ctx, x: x, y: 0.5, r: 2.6, "fff4e0", 0.95) }
+        }
+    },
+    // Gas Giant: the big striped planet's bands, cream, orange and terracotta, tilted
+    // like the planet in the corner, with its soft highlight
+    "gasgiant": { ctx in
+        vertical(ctx, [(0, "f6e2b4"), (1, "f2d4a1")])
+        let tilt: (Double) -> Double = { x in 0.07 * (x / W - 0.5) }
+        let bands: [(String, Double)] = [("f0a860", 0.14), ("f6e2b4", 0.30), ("c67357", 0.44), ("e98f64", 0.56),
+                                          ("f2d4a1", 0.66), ("f0a860", 0.80), ("c67357", 0.93)]
+        for (hex, y) in bands { fillBelow(ctx, hex, 1) { y + tilt($0) } }
+        glow(ctx, x: W * 0.12, y: 0.32, radius: 60, "fffbea", 0.45)
+    },
+    // Ring: the planet's ring as the tray, its cream and tan bands running the length
+    "ring": { ctx in
+        vertical(ctx, [(0, "e2cfa3"), (0.16, "e7d5b0"), (0.17, "f3ecd6"), (0.36, "f3ecd6"), (0.37, "e2cfa3"),
+                       (0.63, "e2cfa3"), (0.64, "f3ecd6"), (0.83, "f3ecd6"), (0.84, "e7d5b0"), (1, "e2cfa3")])
+        for y in [0.365, 0.635] { strokeLine(ctx, "c9b080", 0.55, width: 0.8) { _ in y } }
+    },
+    // Rocket: the rocket's white hull, softly rounded, rivets along the top band and its
+    // pink stripe along the bottom one
+    "rocket": { ctx in
+        vertical(ctx, [(0, "eceaf4"), (0.35, "fdfcff"), (0.7, "f6f5fa"), (1, "e4e2ee")])
+        for x in stride(from: 18.0, to: W - 12, by: 15) { dot(ctx, x: x, y: band * 0.5, r: 0.8, "b9b6c8", 0.9) }
+        strokeLine(ctx, "e84a7e", 1, width: 2.6) { _ in 1 - band * 0.5 }
+    },
+    // Cumulus: the daytime sky, with the wallpaper's outlined cream clouds billowing in
+    // along the top and bottom edges, around the tiles rather than behind them
+    "cumulus": { ctx in
+        vertical(ctx, [(0, "a9d3e6"), (1, "cfe6e2")])
+        glow(ctx, x: W - 70, y: 0.25, radius: 130, "fff6cf", 0.55)
+        var r = Seeded(state: 5)
+        func bank(top: Bool) {
+            var puffs: [(Double, Double)] = []
+            var x = -6.0
+            while x < W + 10 { puffs.append((x, 6.5 + r.next() * 3.5)); x += 11 + r.next() * 7 }
+            let yc = top ? -3.5 / H : 1 + 3.5 / H
+            for (x, rad) in puffs { dot(ctx, x: x, y: yc, r: rad + 1.1, "1e2340", 0.75) }   // outline first,
+            for (x, rad) in puffs { dot(ctx, x: x, y: yc, r: rad, "fffaf0", 1) }            // then the cream over it
+        }
+        bank(top: true); bank(top: false)
+        for (i, x) in gaps.enumerated() where i % 3 == 1 { sparkle(ctx, x: x, y: 0.5, r: 2.4, "ffffff", 0.8) }
+    },
+    // Starlight: the wallpaper's night: indigo, the soft diagonal beam, dotted orbit
+    // tracks in the bands, and white and lime sparkles between tiles
+    "starlight": { ctx in
+        vertical(ctx, [(0, "2a166b"), (1, "1b0f4e")])
+        for (w, a) in [(150.0, 0.16), (70.0, 0.14)] {   // the beam, rising to the right
+            ctx.beginPath(); ctx.move(to: pt(W * 0.25, 1.1)); ctx.addLine(to: pt(W * 0.25 + w, 1.1))
+            ctx.addLine(to: pt(W * 0.75 + w, -0.1)); ctx.addLine(to: pt(W * 0.75, -0.1)); ctx.closePath()
+            ctx.setFillColor(color("8a7ad0", a)); ctx.fillPath()
+        }
+        for y in [band * 0.5, 1 - band * 0.5] {
+            for x in stride(from: 10.0, to: W - 8, by: 6) { dot(ctx, x: x, y: y, r: 0.55, "c9c0f0", 0.55) }
+        }
+        for (i, x) in gaps.enumerated() {
+            let y = 0.34 + 0.32 * Double((i * 3) % 5) / 4
+            if i % 2 == 0 { sparkle(ctx, x: x, y: y, r: 3.2, "f7f2ff", 1) } else { sparkle(ctx, x: x, y: y, r: 2.2, "c8f05a", 1) }
+        }
+    },
+    // Red Planet: the little red planet's dusty rust, darker patches, and a crater in each gap
+    "redplanet": { ctx in
+        vertical(ctx, [(0, "e07a5a"), (0.5, "c8553e"), (1, "a5402f")])
+        var r = Seeded(state: 13)
+        for _ in 0..<max(3, Int(W / 140)) { glow(ctx, x: r.next() * W, y: 0.3 + r.next() * 0.4, radius: 50 + r.next() * 60, "8a464a", 0.35) }
+        glow(ctx, x: W * 0.2, y: 0.2, radius: 120, "f2956e", 0.35)
+        for (i, x) in gaps.enumerated() {
+            let y = 0.3 + 0.4 * Double((i * 5) % 7) / 6, s = 1.7 + Double(i % 3) * 0.45
+            dot(ctx, x: x + 0.5, y: y + 0.6 / H, r: s + 0.6, "f2956e", 0.55)   // the lit rim
+            dot(ctx, x: x, y: y, r: s, "7a3436", 0.75)
+        }
+    },
+    // Phosphor '77: an amber CRT in a dark room. Scanlines over warm black, an instrument
+    // ruler along the top band, a stream of data and a cursor along the bottom. The gaps
+    // stay empty: the icons float on the glass
+    "phosphor": { ctx in
+        vertical(ctx, [(0, "160d04"), (1, "0b0602")])
+        glow(ctx, x: W / 2, y: 0.5, radius: W * 0.45, "ffb000", 0.07)
+        ctx.setFillColor(color("000000", 0.32))
+        for y in stride(from: 0.0, to: H, by: 2) { ctx.fill(CGRect(x: 0, y: y * S, width: W * S, height: S * 0.9)) }
+        for (i, x) in stride(from: 14.0, to: W - 12, by: 6).enumerated() {   // the ruler
+            gapLine(ctx, x: x, 0.0, (i % 5 == 0 ? band * 0.75 : band * 0.35), width: 0.8, "ffb000", i % 5 == 0 ? 0.7 : 0.4)
+        }
+        let y = 1 - band * 0.5
+        ctx.setFillColor(color("ffb000", 0.95)); ctx.fill(CGRect(origin: pt(12, y + 0.04), size: CGSize(width: 4 * S, height: 5 * S)))   // cursor
+        var r = Seeded(state: 77), x = 22.0
+        while x < W - 16 {
+            let len = 2 + r.next() * 12
+            ctx.setFillColor(color("ffb000", 0.25 + r.next() * 0.3)); ctx.fill(CGRect(origin: pt(x, y + 0.012), size: CGSize(width: min(len, W - 16 - x) * S, height: 1.4 * S)))
+            x += len + 3 + r.next() * 4
+        }
+    },
+    // Riso Zine: newsprint, two inks overprinted and slightly out of register: a big
+    // fluorescent pink sun and a yellow slab that turn orange where they cross, a blue
+    // frame printed a hair off, a halftone fade along the top. Most of the page stays bare
+    "riso": { ctx in
+        vertical(ctx, [(0, "f2ece0"), (1, "f2ece0")])
+        var r = Seeded(state: 3)
+        for _ in 0..<Int(W * 2.5) { dot(ctx, x: r.next() * W, y: r.next(), r: 0.3, "2a2418", 0.10) }   // paper grain
+        ctx.setBlendMode(.multiply)
+        dot(ctx, x: W * 0.16, y: 0.95, r: 58, "ff48b0", 0.9)          // the pink sun, sinking off the bottom
+        ctx.beginPath(); ctx.move(to: pt(W * 0.30, -0.1)); ctx.addLine(to: pt(W * 0.30 + 46, -0.1))
+        ctx.addLine(to: pt(W * 0.30 - 10, 1.1)); ctx.addLine(to: pt(W * 0.30 - 56, 1.1)); ctx.closePath()
+        ctx.setFillColor(color("ffe800", 0.95)); ctx.fillPath()       // the yellow slab, crossing it
+        ctx.beginPath(); ctx.move(to: pt(W * 0.74, -0.1)); ctx.addLine(to: pt(W * 0.74 + 18, -0.1))
+        ctx.addLine(to: pt(W * 0.74 - 4, 1.1)); ctx.addLine(to: pt(W * 0.74 - 22, 1.1)); ctx.closePath()
+        ctx.setFillColor(color("ff48b0", 0.85)); ctx.fillPath()       // and a thin pink one far right
+        for (i, x) in stride(from: W * 0.42, to: W - 10, by: 5).enumerated() {   // halftone, fading out
+            let s = max(0, 1.4 - Double(i) * 0.02)
+            if s > 0.15 { dot(ctx, x: x, y: band * 0.5, r: s, "3255a4", 0.9) }
+        }
+        ctx.setBlendMode(.normal)
+        ctx.setStrokeColor(color("3255a4", 0.9)); ctx.setLineWidth(2 * S)   // the blue frame, printed 2pt off
+        ctx.stroke(CGRect(x: 3.5 * S, y: 1.5 * S, width: (W - 5) * S, height: (H - 4.5) * S))
+    },
+    // Moonlight: the half-lit moon, pale grey into its shadow along the dock, with a
+    // crater in each gap, lighter or darker with the side it is on
+    "moonlight": { ctx in
+        horizontal(ctx, [(0, "e6e0d4"), (0.42, "d2cbbd"), (0.58, "7d7984"), (1, "4a4756")])
+        vertical(ctx, [(0, "ffffff"), (1, "000000")], alpha: 0.08)
+        for (i, x) in gaps.enumerated() {
+            let lit = x / W < 0.5, y = 0.32 + 0.36 * Double((i * 3) % 5) / 4, s = 1.8 + Double(i % 3) * 0.5
+            dot(ctx, x: x - 0.4, y: y - 0.5 / H, r: s + 0.5, lit ? "f4f0e8" : "9a96a4", 0.7)
+            dot(ctx, x: x, y: y, r: s, lit ? "b3ab9b" : "3e3b48", 0.8)
+        }
+    },
 ]
 
 guard let draw = scenes[args[1]] else { exit(1) }

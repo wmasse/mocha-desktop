@@ -124,22 +124,23 @@ case "$ACTION" in
     ;;
 
   themes)
-    # Swap this menu's entries for the themes, in two short sections. Each row
+    # Swap this menu's entries for the themes, by section. Each row
     # previews its theme: scenes show a strip of their scenery, the others their
     # tray color and edge. Colors are on their own screen (Customize colors…).
     MENU=(--remove '/menu\..*/')
     menu_entry back "$G_BACK" $OVERLAY "Back" show
     CLASSIC="mocha latte graphite paper nord terminal"
-    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit"
+    SCENES="harvest dusklake alpenglow nightgarden sakura aurora dune tide velvet matcha nebula orbit phosphor riso"
+    CANDY_ORBIT="sticker sherbet daybreak gasgiant ring rocket cumulus starlight redplanet moonlight"
     # any other theme files (your own) go with the classics
     for file in "$CONFIG_DIR"/themes/*.sh; do
       key="$(basename "$file" .sh)"
-      [[ " $CLASSIC $SCENES " == *" $key "* ]] || CLASSIC+=" $key"
+      [[ " $CLASSIC $SCENES $CANDY_ORBIT " == *" $key "* ]] || CLASSIC+=" $key"
     done
     mkdir -p "$CONFIG_DIR/cache"
-    for section in CLASSIC SCENES; do
+    for section in CLASSIC SCENES CANDY_ORBIT; do
       MENU+=(--add item "menu.section_$section" popup."$ITEM"
-             --set "menu.section_$section" icon.drawing=off label="$section" label.drawing=on
+             --set "menu.section_$section" icon.drawing=off label="${section//_/ }" label.drawing=on
                    label.color=$OVERLAY label.font.size=11 label.padding_left=12 background.drawing=off
                    padding_left=8 width=250)
       for NAME_KEY in ${!section}; do

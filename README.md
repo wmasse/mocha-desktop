@@ -28,9 +28,10 @@
 - Right-click for Open or Quit, Show in Finder, Move left or right, Add app, Remove from Dock
 - Drag files onto an app to open them with it, or onto the Trash to delete them
 - Right-click the Trash to see every open app by its icon, with a button beside each to quit it
-- Eighteen themes in a gallery (right-click any tile → **Theme…**), each a full design: shapes, surfaces, how open apps look, and its own typeface. The menu bar follows the dock
+- Thirty themes in a gallery (right-click any tile → **Theme…**), each a full design: shapes, surfaces, how open apps look, and its own typeface. The menu bar follows the dock
   - Classic: Catppuccin Mocha and Latte, Graphite, Paper, Nord Glass, Terminal
-  - Scenes, with scenery drawn behind the tray: Harvest, Dusk Lake, Alpenglow, Night Garden, Sakura, Aurora, Dune, Tide, Velvet, Matcha, Nebula, Orbit. The scenery is laid out around the icons, with its details in the gaps between them
+  - Scenes, with scenery drawn behind the tray: Harvest, Dusk Lake, Alpenglow, Night Garden, Sakura, Aurora, Dune, Tide, Velvet, Matcha, Nebula, Orbit, Phosphor '77 (a 70s sci-fi terminal), Riso Zine (a Risograph print). The scenery is laid out around the icons, with its details in the gaps between them
+  - Candy Orbit, made to go with the Candy Orbit wallpaper's planets and skies: Sticker, Sherbet, Daybreak, Gas Giant, Ring, Rocket, Cumulus, Starlight, Red Planet, Moonlight
 - **Customize colors…** picks your own tray, tile, text and icon colors (saved per theme)
 - Slides out of the way for full-screen apps and back when you leave
 

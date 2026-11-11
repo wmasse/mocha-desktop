@@ -142,22 +142,31 @@ final class ThemeGallery {
         let look = PanelLook.current()
         let current = currentTheme()
         let classic = ["mocha", "latte", "graphite", "paper", "nord", "terminal"]
-        let scenes = ["harvest", "dusklake", "alpenglow", "nightgarden", "sakura", "aurora", "dune", "tide", "velvet", "matcha", "nebula", "orbit"]
+        let scenes = ["harvest", "dusklake", "alpenglow", "nightgarden", "sakura", "aurora", "dune", "tide", "velvet", "matcha",
+                      "nebula", "orbit", "phosphor", "riso"]
+        let orbit = ["sticker", "sherbet", "daybreak", "gasgiant", "ring", "rocket", "cumulus", "starlight", "redplanet", "moonlight"]
         let all = ((try? FileManager.default.contentsOfDirectory(atPath: configDir + "/themes")) ?? [])
             .filter { $0.hasSuffix(".sh") }.map { String($0.dropLast(3)) }
+        let known = classic + scenes + orbit
         let sections: [(String, [String])] = [
-            ("CLASSIC", classic.filter(all.contains) + all.filter { !classic.contains($0) && !scenes.contains($0) }.sorted()),
+            ("CLASSIC", classic.filter(all.contains) + all.filter { !known.contains($0) }.sorted()),
             ("SCENES", scenes.filter(all.contains)),
+            ("CANDY ORBIT", orbit.filter(all.contains)),
         ]
         for key in all where cards[key] == nil { cards[key] = ThemeCard.load(key: key) }
 
-        let cols = 4, cardW: CGFloat = 158, cardH: CGFloat = 92, gap: CGFloat = 12, pad: CGFloat = 22
+        let cardW: CGFloat = 158, cardH: CGFloat = 92, gap: CGFloat = 12, pad: CGFloat = 22
         let header: CGFloat = 58, label: CGFloat = 28, footer: CGFloat = 54
-        let width = pad * 2 + CGFloat(cols) * cardW + CGFloat(cols - 1) * gap
-        var height = header + footer
-        for (_, keys) in sections where !keys.isEmpty {
-            height += label + CGFloat((keys.count + cols - 1) / cols) * (cardH + gap)
+        let screenSize = NSScreen.screens.first?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
+        func size(_ cols: Int) -> NSSize {
+            var h = header + footer
+            for (_, keys) in sections where !keys.isEmpty { h += label + CGFloat((keys.count + cols - 1) / cols) * (cardH + gap) }
+            return NSSize(width: pad * 2 + CGFloat(cols) * cardW + CGFloat(cols - 1) * gap, height: h)
         }
+        // four columns, or more when that would run taller than the screen
+        var cols = 4
+        while size(cols).height > screenSize.height - 140, size(cols + 1).width < screenSize.width - 40 { cols += 1 }
+        let width = size(cols).width, height = size(cols).height
 
         let content = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         content.wantsLayer = true
