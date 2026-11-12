@@ -145,10 +145,21 @@ if wants dock; then
   elif $CAN_BUILD; then
     "$REPO/scripts/swift-build.sh" "$DEST/bin/dockdrop" native "$REPO/dock/dockdrop/main.swift" \
       "$REPO/dock/dockdrop/apps.swift" "$REPO/dock/dockdrop/gallery.swift" \
-      "$REPO/dock/dockdrop/stage.swift" "$REPO/dock/dockdrop/effects.swift" \
+      "$REPO/dock/dockdrop/stage.swift" "$REPO/dock/dockdrop/effects.swift" "$REPO/dock/dockdrop/widget.swift" \
+      "$REPO/dock/dockdrop/picker.swift" \
       || echo "    couldn't build the dock helper; the dock works, but without hover, drag and drop or its panels"
   else
     echo "    skipped the dock helper (needs Xcode Command Line Tools: xcode-select --install)"
+  fi
+  # Mocha Location (the weather widget's "Use My Location"): a tiny app, since macOS
+  # only gives location to apps that ask for it by name
+  if [ -d "$REPO/dock/bin/MochaLocation.app" ]; then
+    rm -rf "$DEST/bin/MochaLocation.app"; cp -R "$REPO/dock/bin/MochaLocation.app" "$DEST/bin/"
+  elif $CAN_BUILD; then
+    mkdir -p "$DEST/bin/MochaLocation.app/Contents/MacOS" && cp "$REPO/dock/locate/Info.plist" "$DEST/bin/MochaLocation.app/Contents/"
+    "$REPO/scripts/swift-build.sh" "$DEST/bin/MochaLocation.app/Contents/MacOS/MochaLocation" native "$REPO/dock/locate/main.swift" \
+      && codesign --force --sign - "$DEST/bin/MochaLocation.app" 2>/dev/null \
+      || echo "    couldn't build Mocha Location; the weather widget works with a city you pick"
   fi
   if [ -x "$REPO/dock/bin/dockart" ]; then
     cp "$REPO/dock/bin/dockart" "$DEST/bin/dockart"

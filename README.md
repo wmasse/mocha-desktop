@@ -10,6 +10,7 @@
 
 **Menu bar**
 - Pills for the Apple menu, current app, Amphetamine, Low Power Mode, Do Not Disturb, volume, Wi‑Fi, battery, and date and time, in the current theme's colors and typeface
+- Click the battery for a menu with how much is left and, in minutes, how long it'll last, or how long until it's full while charging
 - They sit on a strip cut from the top of your own wallpaper (it follows dynamic wallpapers through the day), so the bar blends into the desktop while covering Apple's menu bar
 - The notch stays empty, so apps that live there aren't covered
 - Click the current app to hide it, hide the others or quit it
@@ -34,6 +35,7 @@
   - Candy Orbit, made to go with the Candy Orbit wallpaper's planets and skies: Sticker, Sherbet, Daybreak, Gas Giant, Ring, Rocket, Cumulus, Starlight, Red Planet, Moonlight
   - Styles, one for each design style: Broadsheet (brutalist editorial), Saddle (warm tactile analog), Swiss (high-contrast Swiss grid), Phosphor '77 (70s sci-fi terminal), Pop (neo-brutalist pop), Precision (precision industrial hardware), Obsidian (high-craft dark mode), Millennium (Y2K cyber-minimalism), Bento (Japanese bento and magazine editorial), Riso Zine (Risograph and indie zine print)
   - Effects, where the dock comes alive around the app you're on: Current (water flows over to it and swells up behind it), Claymation (stop-motion clay builds up around it), Ferrofluid (magnetic fluid spikes up around it), Pop-Up (a paper scene folds up out of a book behind it), Live Wire (a spark runs over and lights a neon outline), Hourglass (sand pours onto it and piles higher the longer you stay), Overgrowth (vines climb it and flower), Lava (a lava lamp rises around it), Campfire (a pixel fire burns under it), Jelly (its jelly block grows and wobbles). They react when you point at a tile too, and pause in Low Power Mode and while the screen sleeps
+- A weather widget on the desktop, drawn in the current theme (its colors, typeface and tray edge, with the forecast on tiles shaped like the dock's). Click it to open Weather, drag it anywhere, right-click for small or medium, °F or °C, to pick your city on a map (or follow your location), or to hide it (the Trash's menu brings it back). Forecasts come from Open-Meteo, which is sent only the place's coordinates; Use My Location goes through a tiny app, Mocha Location, that asks macOS for permission the first time
 - **Customize colors…** picks your own tray, tile, text and icon colors (saved per theme)
 - Slides out of the way for full-screen apps and back when you leave
 
@@ -84,6 +86,7 @@ Open the app and click **Uninstall**, or run `./uninstall.sh`. It brings back Ap
   - **Drag and drop:** SketchyBar can't receive drops, so the helper keeps an invisible window over the dock that only catches drops while a file drag is happening. Since macOS 27 that window isn't always told about the drop, so the helper also watches for the button coming up over a tile and handles the files itself.
   - **Menus:** it closes the dock's menus when you click elsewhere.
   - **Panels:** the open-apps panel and the theme gallery are native panels drawn in the current theme (`apps.swift`, `gallery.swift`).
+  - **Weather widget:** a window at the desktop widgets' level, so app windows cover it (`widget.swift`). Your city and its spot are saved in `widget.json`.
   - **Effects:** for effect themes, the helper keeps a see-through window behind the tiles and animates it (`stage.swift`, `effects.swift`), following the app in front and the tile under the pointer. It only draws while something is moving, at each effect's own frame rate.
 - **Scenery:** `dock/dockart` draws each scene theme's scenery (gradients and simple shapes) at the tray's exact width.
 - **Installer app:** `app/` holds the installer app, which runs `install.sh` and shows its output.

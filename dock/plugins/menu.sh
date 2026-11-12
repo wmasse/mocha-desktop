@@ -96,6 +96,13 @@ case "$ACTION" in
     if [ "$KEY" = "trash" ]; then
       menu_entry open "$G_FOLDER" $BLUE "Open Trash" open
       menu_entry add "$G_ADD" $GREEN "Add app…" add
+      if [ -x "$CONFIG_DIR/bin/dockdrop" ]; then   # the weather widget (dockdrop/widget.swift)
+        if grep -q '"hidden":true' "$CONFIG_DIR/widget.json" 2>/dev/null; then
+          menu_entry widget "$G_WEATHER" $YELLOW "Show Weather Widget" widget
+        else
+          menu_entry widget "$G_WEATHER" $YELLOW "Hide Weather Widget" widget
+        fi
+      fi
     else
       if is_running "$(field 3)"; then
         menu_entry quit "$G_QUIT" $RED "Quit" quit
@@ -111,6 +118,11 @@ case "$ACTION" in
     menu_entry theme "$G_THEME" $MAUVE "Theme…" gallery
     mochadock "${MENU[@]}" --set "$ITEM" popup.drawing=on 2>/dev/null
     mkdir -p "$(dirname "$MENU_FILE")" && echo "$ITEM" > "$MENU_FILE"
+    ;;
+
+  widget)
+    close_menu
+    "$CONFIG_DIR/bin/dockdrop" widget toggle
     ;;
 
   gallery)

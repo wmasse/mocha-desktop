@@ -353,6 +353,7 @@ final class Helper: NSObject, NSApplicationDelegate {
     private let appsPanel = AppsPanel()
     private let gallery = ThemeGallery()
     private let stage = Stage()
+    private let widget = WeatherWidget()
 
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -392,6 +393,7 @@ final class Helper: NSObject, NSApplicationDelegate {
         hover.onGeometry = { [weak self] in self?.stage.update(spots: $0, yOffset: $1, height: $2, shown: $3, tile: $4, gap: $5) }
         hover.onHover = { [weak self] in self?.stage.hoverChanged($0) }
         stage.start()
+        widget.start()
         hover.start()
 
         // Watch for file drags 20 times a second; this is cheap and needs no permissions
@@ -479,6 +481,19 @@ final class Helper: NSObject, NSApplicationDelegate {
 if CommandLine.arguments.count == 4, CommandLine.arguments[1] == "slide" {
     DistributedNotificationCenter.default().postNotificationName(slideNote, object: "\(CommandLine.arguments[2]),\(CommandLine.arguments[3])",
                                                                  userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
+
+// dockdrop widget [show|hide|toggle]: the weather widget in the running helper
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "widget" {
+    DistributedNotificationCenter.default().postNotificationName(widgetNote, object: CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "toggle",
+                                                                 userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
+// dockdrop widget-preview <out.png> <theme> [medium]: a picture of the widget in a theme
+if CommandLine.arguments.count >= 4, CommandLine.arguments[1] == "widget-preview" {
+    _ = NSApplication.shared
+    widgetPreview(Array(CommandLine.arguments.dropFirst()))
     exit(0)
 }
 
